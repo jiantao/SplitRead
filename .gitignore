@@ -1,0 +1,6 @@
+tags 
+*.txt 
+*.o 
+test.*
+*.fa
+*.out
