@@ -1,0 +1,228 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+BestRegion	SR_HashRegionArray.h	/^typedef struct BestRegion$/;"	s
+BestRegion	SR_HashRegionArray.h	/^}BestRegion;$/;"	t	typeref:struct:BestRegion
+BestRegion::length	SR_HashRegionArray.h	/^    unsigned short length;$/;"	m	struct:BestRegion	access:public
+BestRegion::numPos	SR_HashRegionArray.h	/^    unsigned short numPos;$/;"	m	struct:BestRegion	access:public
+BestRegion::queryBegin	SR_HashRegionArray.h	/^    unsigned short queryBegin;$/;"	m	struct:BestRegion	access:public
+BestRegion::refBegins	SR_HashRegionArray.h	/^    uint32_t refBegins[MAX_BEST_REF_BEGINS];$/;"	m	struct:BestRegion	access:public
+BestRegionArray	SR_HashRegionArray.h	/^typedef struct BestRegionArray$/;"	s
+BestRegionArray	SR_HashRegionArray.h	/^}BestRegionArray;$/;"	t	typeref:struct:BestRegionArray
+BestRegionArray::capacity	SR_HashRegionArray.h	/^    unsigned int capacity;$/;"	m	struct:BestRegionArray	access:public
+BestRegionArray::data	SR_HashRegionArray.h	/^    BestRegion* data;$/;"	m	struct:BestRegionArray	access:public
+BestRegionArray::size	SR_HashRegionArray.h	/^    unsigned int size;$/;"	m	struct:BestRegionArray	access:public
+Bool	SR_Types.h	/^typedef unsigned char Bool;$/;"	t
+CHECK_HARDWARE_PROPERTIES	md5.h	61;"	d
+CURR_DIR	Makefile	/^CURR_DIR := $(shell pwd)$/;"	m
+DEFAULT_HASH_ARR_CAPACITY	SR_HashRegionArray.h	34;"	d
+DEFAULT_REF_CAPACITY	SR_Reference.h	34;"	d
+DEFAULT_START_CHR	SR_Reference.h	37;"	d
+DEL_LEN	test.c	31;"	d	file:
+DEPENDANTS	Makefile	/^DEPENDANTS = $(SOURCES:.c=.d)$/;"	m
+F1	md5.c	159;"	d	file:
+F2	md5.c	160;"	d	file:
+F3	md5.c	161;"	d	file:
+F4	md5.c	162;"	d	file:
+FALSE	SR_Types.h	24;"	d
+GET_HIGH_END_MASK	SR_InHashTable.h	32;"	d
+GetNextHashKey	SR_HashRegionTable.c	/^static Bool GetNextHashKey(const char* query, unsigned int queryLen, unsigned int* pPos, uint32_t* pHashKey, uint32_t mask, unsigned int hashSize)$/;"	f	file:	signature:(const char* query, unsigned int queryLen, unsigned int* pPos, uint32_t* pHashKey, uint32_t mask, unsigned int hashSize)
+GetStartHashPosIndex	SR_HashRegionTable.c	/^static unsigned int GetStartHashPosIndex(const HashPosView* pHashPosView, uint32_t refStart)$/;"	f	file:	signature:(const HashPosView* pHashPosView, uint32_t refStart)
+HASHARRAY_H	SR_HashRegionArray.h	21;"	d
+HASHREGIONTABLE_H	SR_HashRegionTable.h	20;"	d
+HIGHFIRST	md5.h	19;"	d
+HIGHFIRST	md5.h	22;"	d
+HashPosView	SR_InHashTable.h	/^typedef struct HashPosView$/;"	s
+HashPosView	SR_InHashTable.h	/^}HashPosView;$/;"	t	typeref:struct:HashPosView
+HashPosView::data	SR_InHashTable.h	/^    const uint32_t* data;     \/\/ the address where a certain hash start in the "hashPos" array in the "SR_InHashTable" object $/;"	m	struct:HashPosView	access:public
+HashPosView::size	SR_InHashTable.h	/^    unsigned int size;        \/\/ total number of hash position found in the reference for a certain hash $/;"	m	struct:HashPosView	access:public
+HashRegion	SR_HashRegionArray.h	/^typedef struct HashRegion$/;"	s
+HashRegion	SR_HashRegionArray.h	/^}HashRegion;$/;"	t	typeref:struct:HashRegion
+HashRegion::length	SR_HashRegionArray.h	/^    unsigned short length;       \/\/ length of a hash region$/;"	m	struct:HashRegion	access:public
+HashRegion::queryBegin	SR_HashRegionArray.h	/^    unsigned short queryBegin;   \/\/ begin position of a hash region at a read$/;"	m	struct:HashRegion	access:public
+HashRegion::refBegin	SR_HashRegionArray.h	/^    uint32_t       refBegin;     \/\/ begin position of a hash region at the reference$/;"	m	struct:HashRegion	access:public
+HashRegionArray	SR_HashRegionArray.h	/^typedef struct HashRegionArray$/;"	s
+HashRegionArray	SR_HashRegionArray.h	/^}HashRegionArray;$/;"	t	typeref:struct:HashRegionArray
+HashRegionArray::capacity	SR_HashRegionArray.h	/^    unsigned int capacity; \/\/ maximum number of objects that can be held in the array$/;"	m	struct:HashRegionArray	access:public
+HashRegionArray::data	SR_HashRegionArray.h	/^    HashRegion* data;      \/\/ array of hash regions $/;"	m	struct:HashRegionArray	access:public
+HashRegionArray::size	SR_HashRegionArray.h	/^    unsigned int size;     \/\/ size of the array$/;"	m	struct:HashRegionArray	access:public
+HashRegionTable	SR_HashRegionTable.h	/^typedef struct HashRegionTable$/;"	s
+HashRegionTable	SR_HashRegionTable.h	/^}HashRegionTable;$/;"	t	typeref:struct:HashRegionTable
+HashRegionTable::edgeTolPercent	SR_HashRegionTable.h	/^    double edgeTolPercent;                 \/\/ the best hash regions should start at a read no later than this position$/;"	m	struct:HashRegionTable	access:public
+HashRegionTable::pBestCloseRegions	SR_HashRegionTable.h	/^    BestRegionArray* pBestCloseRegions;    \/\/ an array hold the best hash regions within the closer search region$/;"	m	struct:HashRegionTable	access:public
+HashRegionTable::pBestFarRegions	SR_HashRegionTable.h	/^    BestRegionArray* pBestFarRegions;      \/\/ an array hold the best hash regions within the further search region$/;"	m	struct:HashRegionTable	access:public
+HashRegionTable::pCurrRegions	SR_HashRegionTable.h	/^    HashRegionArray* pCurrRegions;        \/\/ an array hold the hash regions that start at current bp$/;"	m	struct:HashRegionTable	access:public
+HashRegionTable::pPrevRegions	SR_HashRegionTable.h	/^    HashRegionArray* pPrevRegions;         \/\/ an array hold the hash regions that start at 1bp before$/;"	m	struct:HashRegionTable	access:public
+HashRegionTable::searchBegin	SR_HashRegionTable.h	/^    unsigned int searchBegin;              \/\/ lower limit in searching the prevHashArray$/;"	m	struct:HashRegionTable	access:public
+HashRegionTableAlloc	SR_HashRegionTable.c	/^HashRegionTable* HashRegionTableAlloc(double edgeTolPercent)$/;"	f	signature:(double edgeTolPercent)
+HashRegionTableAlloc	SR_HashRegionTable.h	/^HashRegionTable* HashRegionTableAlloc(double edgeTolPercent);$/;"	p	signature:(double edgeTolPercent)
+HashRegionTableFree	SR_HashRegionTable.c	/^void HashRegionTableFree(HashRegionTable* pRegionTable)$/;"	f	signature:(HashRegionTable* pRegionTable)
+HashRegionTableFree	SR_HashRegionTable.h	/^void HashRegionTableFree(HashRegionTable* pRegionTable);$/;"	p	signature:(HashRegionTable* pRegionTable)
+HashRegionTableInit	SR_HashRegionTable.c	/^void HashRegionTableInit(HashRegionTable* pRegionTable, unsigned short queryLen)$/;"	f	signature:(HashRegionTable* pRegionTable, unsigned short queryLen)
+HashRegionTableInit	SR_HashRegionTable.h	/^void HashRegionTableInit(HashRegionTable* pRegionTable, unsigned short queryLen);$/;"	p	signature:(HashRegionTable* pRegionTable, unsigned short queryLen)
+HashRegionTableLoad	SR_HashRegionTable.c	/^void HashRegionTableLoad(HashRegionTable* pRegionTable, const SR_InHashTable* pHashTable, const QueryRegion* pQueryRegion)$/;"	f	signature:(HashRegionTable* pRegionTable, const SR_InHashTable* pHashTable, const QueryRegion* pQueryRegion)
+HashRegionTableLoad	SR_HashRegionTable.h	/^void HashRegionTableLoad(HashRegionTable* pRegionTable, const SR_InHashTable* pHashTable, const QueryRegion* pQueryRegion);$/;"	p	signature:(HashRegionTable* pRegionTable, const SR_InHashTable* pHashTable, const QueryRegion* pQueryRegion)
+HashRegionTableReverseBest	SR_HashRegionTable.c	/^void HashRegionTableReverseBest(HashRegionTable* pRegionTable)$/;"	f	signature:(HashRegionTable* pRegionTable)
+HashRegionTableReverseBest	SR_HashRegionTable.h	/^void HashRegionTableReverseBest(HashRegionTable* pRegionTable);$/;"	p	signature:(HashRegionTable* pRegionTable)
+INVALID_CHR_ID	SR_Types.h	38;"	d
+InitSimQueryRegion	test.c	/^void InitSimQueryRegion(QueryRegion* pQueryRegion, const SR_Reference* pRef, unsigned short queryLen, unsigned int searchLen, unsigned int delLen)$/;"	f	signature:(QueryRegion* pQueryRegion, const SR_Reference* pRef, unsigned short queryLen, unsigned int searchLen, unsigned int delLen)
+InitSimQueryRegion	test.c	/^void InitSimQueryRegion(QueryRegion* pQueryRegion, const SR_Reference* pRef, unsigned short queryLen, unsigned int searchRegion, unsigned int delLen);$/;"	p	file:	signature:(QueryRegion* pQueryRegion, const SR_Reference* pRef, unsigned short queryLen, unsigned int searchRegion, unsigned int delLen)
+MAXLINE_ERR	SR_Error.h	5;"	d
+MAX_BEST_REF_BEGINS	SR_HashRegionArray.h	31;"	d
+MAX_HASH_SIZE	SR_Types.h	40;"	d
+MAX_REF_LINE	SR_Reference.h	29;"	d
+MD5Context	md5.h	/^struct MD5Context {$/;"	s
+MD5Context::bits	md5.h	/^        uint32 bits[2];$/;"	m	struct:MD5Context	access:public
+MD5Context::buf	md5.h	/^        uint32 buf[4];$/;"	m	struct:MD5Context	access:public
+MD5Context::in	md5.h	/^        unsigned char in[64];$/;"	m	struct:MD5Context	access:public
+MD5Final	md5.c	/^void MD5Final(digest, ctx)$/;"	f
+MD5Final	md5.h	/^extern void MD5Final( unsigned char digest[16], struct MD5Context *ctx );$/;"	p	signature:( unsigned char digest[16], struct MD5Context *ctx )
+MD5Init	md5.c	/^void MD5Init(ctx)$/;"	f
+MD5Init	md5.h	/^extern void MD5Init( struct MD5Context *ctx );$/;"	p	signature:( struct MD5Context *ctx )
+MD5STEP	md5.c	165;"	d	file:
+MD5Transform	md5.c	/^void MD5Transform(buf, in)$/;"	f
+MD5Transform	md5.h	/^extern void MD5Transform( uint32 buf[4], uint32 in[16] );$/;"	p	signature:( uint32 buf[4], uint32 in[16] )
+MD5Update	md5.c	/^void MD5Update(ctx, buf, len)$/;"	f
+MD5Update	md5.h	/^extern void MD5Update( struct MD5Context *ctx, unsigned char *buf, unsigned len );$/;"	p	signature:( struct MD5Context *ctx, unsigned char *buf, unsigned len )
+MD5_CHECKSUM_LEN	SR_Types.h	28;"	d
+MD5_CTX	md5.h	/^typedef struct MD5Context MD5_CTX;$/;"	t	typeref:struct:MD5Context
+MD5_H	md5.h	2;"	d
+MD5_STR_LEN	SR_Types.h	30;"	d
+MT	SR_Types.h	36;"	d
+MergeHashRegions	SR_HashRegionTable.c	/^static Bool MergeHashRegions(HashRegionTable* pRegionTable, HashRegion* pNewRegion)$/;"	f	file:	signature:(HashRegionTable* pRegionTable, HashRegion* pNewRegion)
+ProcessHeaderLine	SR_Reference.c	/^static unsigned char ProcessHeaderLine(const char* buff)$/;"	f	file:	signature:(const char* buff)
+ProcessRefLine	SR_Reference.c	/^static const char* ProcessRefLine(unsigned short* len, char* buff)$/;"	f	file:	signature:(unsigned short* len, char* buff)
+QueryRegion	SR_HashRegionTable.h	/^typedef struct QueryRegion$/;"	s
+QueryRegion	SR_HashRegionTable.h	/^}QueryRegion;$/;"	t	typeref:struct:QueryRegion
+QueryRegion::closeRefBound	SR_HashRegionTable.h	/^    uint32_t closeRefBound;         \/\/ the end position of the search region for the first partial alignment (closer to the anchor mate)$/;"	m	struct:QueryRegion	access:public
+QueryRegion::farRefBound	SR_HashRegionTable.h	/^    uint32_t farRefBound;           \/\/ the end position of search region for the second partial alignment (further from the anchor mate)$/;"	m	struct:QueryRegion	access:public
+QueryRegion::query	SR_HashRegionTable.h	/^    const char* query;              \/\/ sequencing read$/;"	m	struct:QueryRegion	access:public
+QueryRegion::queryLen	SR_HashRegionTable.h	/^    unsigned short queryLen;        \/\/ length of the read$/;"	m	struct:QueryRegion	access:public
+QueryRegion::refBegin	SR_HashRegionTable.h	/^    uint32_t refBegin;              \/\/ the beginning position of search region for the first partial alignment (closer to the anchor mate)$/;"	m	struct:QueryRegion	access:public
+READ_HASH_SIZE	SR_InHashTable.h	34;"	d
+ResetBestRegions	SR_HashRegionTable.c	/^static void ResetBestRegions(HashRegionTable* pRegionTable, unsigned short queryLen)$/;"	f	file:	signature:(HashRegionTable* pRegionTable, unsigned short queryLen)
+SEARCH_REGION	test.c	29;"	d	file:
+SOURCES	Makefile	/^SOURCES  := $(wildcard *.c)$/;"	m
+SR_ARRAY_ALLOC	SR_Utilities.h	48;"	d
+SR_ARRAY_FREE	SR_Utilities.h	97;"	d
+SR_ARRAY_GET	SR_Utilities.h	42;"	d
+SR_ARRAY_GET_PT	SR_Utilities.h	44;"	d
+SR_ARRAY_GET_SIZE	SR_Utilities.h	46;"	d
+SR_ARRAY_INIT	SR_Utilities.h	59;"	d
+SR_ARRAY_PUSH	SR_Utilities.h	72;"	d
+SR_ARRAY_RESET	SR_Utilities.h	89;"	d
+SR_EMPTY	SR_Types.h	42;"	d
+SR_ERROR_H	SR_Error.h	2;"	d
+SR_ErrDoit	SR_Error.c	/^static void SR_ErrDoit(int errnoflag, const char *fmt, va_list ap)$/;"	f	file:	signature:(int errnoflag, const char *fmt, va_list ap)
+SR_ErrDoit	SR_Error.c	/^static void SR_ErrDoit(int, const char *, va_list);$/;"	p	file:	signature:(int, const char *, va_list)
+SR_ErrDump	SR_Error.c	/^void SR_ErrDump(const char *fmt, ...)$/;"	f	signature:(const char *fmt, ...)
+SR_ErrDump	SR_Error.h	/^void SR_ErrDump(const char *, ...);	$/;"	p	signature:(const char *, ...)
+SR_ErrMsg	SR_Error.c	/^void SR_ErrMsg(const char *fmt, ...)$/;"	f	signature:(const char *fmt, ...)
+SR_ErrMsg	SR_Error.h	/^void SR_ErrMsg(const char *, ...);$/;"	p	signature:(const char *, ...)
+SR_ErrQuit	SR_Error.c	/^void SR_ErrQuit(const char *fmt, ...)$/;"	f	signature:(const char *fmt, ...)
+SR_ErrQuit	SR_Error.h	/^void SR_ErrQuit(const char *, ...);$/;"	p	signature:(const char *, ...)
+SR_ErrRet	SR_Error.c	/^void SR_ErrRet(const char *fmt, ...)$/;"	f	signature:(const char *fmt, ...)
+SR_ErrRet	SR_Error.h	/^void SR_ErrRet(const char *, ...);$/;"	p	signature:(const char *, ...)
+SR_ErrSys	SR_Error.c	/^void SR_ErrSys(const char *fmt, ...)$/;"	f	signature:(const char *fmt, ...)
+SR_ErrSys	SR_Error.h	/^void SR_ErrSys(const char *, ...);$/;"	p	signature:(const char *, ...)
+SR_INHASHTABLE_H	SR_InHashTable.h	19;"	d
+SR_InHashTable	SR_InHashTable.h	/^typedef struct SR_InHashTable$/;"	s
+SR_InHashTable	SR_InHashTable.h	/^}SR_InHashTable;$/;"	t	typeref:struct:SR_InHashTable
+SR_InHashTable::chr	SR_InHashTable.h	/^    unsigned char chr;             \/\/ chromosome of the current reference hash table$/;"	m	struct:SR_InHashTable	access:public
+SR_InHashTable::hashPos	SR_InHashTable.h	/^    uint32_t* hashPos;             \/\/ positions of hashes found in the reference sequence$/;"	m	struct:SR_InHashTable	access:public
+SR_InHashTable::hashSize	SR_InHashTable.h	/^    unsigned char hashSize;        \/\/ size of hash$/;"	m	struct:SR_InHashTable	access:public
+SR_InHashTable::highEndMask	SR_InHashTable.h	/^    uint32_t  highEndMask;         \/\/ a mask to clar the highest 2 bits in a hash key$/;"	m	struct:SR_InHashTable	access:public
+SR_InHashTable::indices	SR_InHashTable.h	/^    uint32_t* indices;             \/\/ index of a given hash in the "hashPos" array$/;"	m	struct:SR_InHashTable	access:public
+SR_InHashTable::md5	SR_InHashTable.h	/^    char md5[MD5_STR_LEN + 1];     \/\/ md5 checksum string$/;"	m	struct:SR_InHashTable	access:public
+SR_InHashTable::numHashes	SR_InHashTable.h	/^    uint32_t  numHashes;           \/\/ total number of different hashes$/;"	m	struct:SR_InHashTable	access:public
+SR_InHashTable::numPos	SR_InHashTable.h	/^    uint32_t  numPos;              \/\/ total number of hash positions found in reference$/;"	m	struct:SR_InHashTable	access:public
+SR_InHashTableAlloc	SR_InHashTable.c	/^SR_InHashTable* SR_InHashTableAlloc(unsigned char hashSize)$/;"	f	signature:(unsigned char hashSize)
+SR_InHashTableAlloc	SR_InHashTable.h	/^SR_InHashTable* SR_InHashTableAlloc(unsigned char hashSize);$/;"	p	signature:(unsigned char hashSize)
+SR_InHashTableFree	SR_InHashTable.c	/^void SR_InHashTableFree(SR_InHashTable* pHashTable)$/;"	f	signature:(SR_InHashTable* pHashTable)
+SR_InHashTableFree	SR_InHashTable.h	/^void SR_InHashTableFree(SR_InHashTable* pHashTable);$/;"	p	signature:(SR_InHashTable* pHashTable)
+SR_InHashTableRead	SR_InHashTable.c	/^Bool SR_InHashTableRead(SR_InHashTable* pHashTable, FILE* hashTableInput)$/;"	f	signature:(SR_InHashTable* pHashTable, FILE* hashTableInput)
+SR_InHashTableRead	SR_InHashTable.h	/^Bool SR_InHashTableRead(SR_InHashTable* pHashTable, FILE* hashTableInput);$/;"	p	signature:(SR_InHashTable* pHashTable, FILE* hashTableInput)
+SR_InHashTableSearch	SR_InHashTable.c	/^Bool SR_InHashTableSearch(HashPosView* hashPosView, const SR_InHashTable* pHashTable, uint32_t hashKey)$/;"	f	signature:(HashPosView* hashPosView, const SR_InHashTable* pHashTable, uint32_t hashKey)
+SR_InHashTableSearch	SR_InHashTable.h	/^Bool SR_InHashTableSearch(HashPosView* hashPosView, const SR_InHashTable* pHashTable, uint32_t hashKey);$/;"	p	signature:(HashPosView* hashPosView, const SR_InHashTable* pHashTable, uint32_t hashKey)
+SR_REFERENCE_H	SR_Reference.h	20;"	d
+SR_Reference	SR_Reference.h	/^typedef struct SR_Reference$/;"	s
+SR_Reference	SR_Reference.h	/^}SR_Reference;$/;"	t	typeref:struct:SR_Reference
+SR_Reference::capacity	SR_Reference.h	/^    uint32_t capacity;            \/\/ total number of characters allocated$/;"	m	struct:SR_Reference	access:public
+SR_Reference::chr	SR_Reference.h	/^    unsigned char chr;            \/\/ chromsome ID$/;"	m	struct:SR_Reference	access:public
+SR_Reference::length	SR_Reference.h	/^    uint32_t length;              \/\/ length of the chromosome$/;"	m	struct:SR_Reference	access:public
+SR_Reference::md5	SR_Reference.h	/^    char  md5[MD5_STR_LEN + 1];   \/\/ md5 checksum string$/;"	m	struct:SR_Reference	access:public
+SR_Reference::sequence	SR_Reference.h	/^    char* sequence;               \/\/ reference sequence$/;"	m	struct:SR_Reference	access:public
+SR_ReferenceAlloc	SR_Reference.c	/^SR_Reference* SR_ReferenceAlloc(uint32_t capacity)$/;"	f	signature:(uint32_t capacity)
+SR_ReferenceAlloc	SR_Reference.h	/^SR_Reference* SR_ReferenceAlloc(uint32_t capacity);$/;"	p	signature:(uint32_t capacity)
+SR_ReferenceFree	SR_Reference.c	/^void SR_ReferenceFree(SR_Reference* reference)$/;"	f	signature:(SR_Reference* reference)
+SR_ReferenceFree	SR_Reference.h	/^void SR_ReferenceFree(SR_Reference* reference);$/;"	p	signature:(SR_Reference* reference)
+SR_ReferenceLoad	SR_Reference.c	/^Bool SR_ReferenceLoad(SR_Reference* reference, unsigned char* nextChr, FILE* faInput)$/;"	f	signature:(SR_Reference* reference, unsigned char* nextChr, FILE* faInput)
+SR_ReferenceLoad	SR_Reference.h	/^Bool SR_ReferenceLoad(SR_Reference* reference, unsigned char* nextChr, FILE* faInput);$/;"	p	signature:(SR_Reference* reference, unsigned char* nextChr, FILE* faInput)
+SR_ReferenceRead	SR_Reference.c	/^Bool SR_ReferenceRead(SR_Reference* reference, FILE* refInput)$/;"	f	signature:(SR_Reference* reference, FILE* refInput)
+SR_ReferenceRead	SR_Reference.h	/^Bool SR_ReferenceRead(SR_Reference* reference, FILE* refInput);$/;"	p	signature:(SR_Reference* reference, FILE* refInput)
+SR_ReferenceReset	SR_Reference.h	40;"	d
+SR_ReferenceSkip	SR_Reference.c	/^Bool SR_ReferenceSkip(unsigned char* nextChr, FILE* faInput)$/;"	f	signature:(unsigned char* nextChr, FILE* faInput)
+SR_ReferenceSkip	SR_Reference.h	/^Bool SR_ReferenceSkip(unsigned char* nextChr, FILE* faInput);$/;"	p	signature:(unsigned char* nextChr, FILE* faInput)
+SR_ReferenceWrite	SR_Reference.c	/^off_t SR_ReferenceWrite(FILE* refOutput, const SR_Reference* reference)$/;"	f	signature:(FILE* refOutput, const SR_Reference* reference)
+SR_ReferenceWrite	SR_Reference.h	/^off_t SR_ReferenceWrite(FILE* refOutput, const SR_Reference* reference);$/;"	p	signature:(FILE* refOutput, const SR_Reference* reference)
+SR_SWAP	SR_Utilities.h	27;"	d
+SR_TO_STRING	SR_Utilities.h	25;"	d
+SR_TO_STRING_PRE	SR_Utilities.h	23;"	d
+SR_TYPES_H	SR_Types.h	20;"	d
+SR_UTILITIES_H	SR_Utilities.h	20;"	d
+SetMd5	SR_Reference.c	/^static void SetMd5(SR_Reference* reference)$/;"	f	file:	signature:(SR_Reference* reference)
+TEST_TIME	test.c	27;"	d	file:
+TRUE	SR_Types.h	26;"	d
+UpdateBestRegions	SR_HashRegionTable.c	/^static void UpdateBestRegions(HashRegionTable* pRegionTable, const HashRegion* pNewRegion, const QueryRegion* pQueryRegion)$/;"	f	file:	signature:(HashRegionTable* pRegionTable, const HashRegion* pNewRegion, const QueryRegion* pQueryRegion)
+X	SR_Types.h	32;"	d
+Y	SR_Types.h	34;"	d
+bits	md5.h	/^        uint32 bits[2];$/;"	m	struct:MD5Context	access:public
+buf	md5.h	/^        uint32 buf[4];$/;"	m	struct:MD5Context	access:public
+byteReverse	md5.c	/^void byteReverse(buf, longs)$/;"	f
+byteReverse	md5.c	26;"	d	file:
+capacity	SR_HashRegionArray.h	/^    unsigned int capacity; \/\/ maximum number of objects that can be held in the array$/;"	m	struct:HashRegionArray	access:public
+capacity	SR_HashRegionArray.h	/^    unsigned int capacity;$/;"	m	struct:BestRegionArray	access:public
+capacity	SR_Reference.h	/^    uint32_t capacity;            \/\/ total number of characters allocated$/;"	m	struct:SR_Reference	access:public
+chr	SR_InHashTable.h	/^    unsigned char chr;             \/\/ chromosome of the current reference hash table$/;"	m	struct:SR_InHashTable	access:public
+chr	SR_Reference.h	/^    unsigned char chr;            \/\/ chromsome ID$/;"	m	struct:SR_Reference	access:public
+closeRefBound	SR_HashRegionTable.h	/^    uint32_t closeRefBound;         \/\/ the end position of the search region for the first partial alignment (closer to the anchor mate)$/;"	m	struct:QueryRegion	access:public
+data	SR_HashRegionArray.h	/^    BestRegion* data;$/;"	m	struct:BestRegionArray	access:public
+data	SR_HashRegionArray.h	/^    HashRegion* data;      \/\/ array of hash regions $/;"	m	struct:HashRegionArray	access:public
+data	SR_InHashTable.h	/^    const uint32_t* data;     \/\/ the address where a certain hash start in the "hashPos" array in the "SR_InHashTable" object $/;"	m	struct:HashPosView	access:public
+edgeTolPercent	SR_HashRegionTable.h	/^    double edgeTolPercent;                 \/\/ the best hash regions should start at a read no later than this position$/;"	m	struct:HashRegionTable	access:public
+farRefBound	SR_HashRegionTable.h	/^    uint32_t farRefBound;           \/\/ the end position of search region for the second partial alignment (further from the anchor mate)$/;"	m	struct:QueryRegion	access:public
+hashPos	SR_InHashTable.h	/^    uint32_t* hashPos;             \/\/ positions of hashes found in the reference sequence$/;"	m	struct:SR_InHashTable	access:public
+hashSize	SR_InHashTable.h	/^    unsigned char hashSize;        \/\/ size of hash$/;"	m	struct:SR_InHashTable	access:public
+highEndMask	SR_InHashTable.h	/^    uint32_t  highEndMask;         \/\/ a mask to clar the highest 2 bits in a hash key$/;"	m	struct:SR_InHashTable	access:public
+in	md5.h	/^        unsigned char in[64];$/;"	m	struct:MD5Context	access:public
+indices	SR_InHashTable.h	/^    uint32_t* indices;             \/\/ index of a given hash in the "hashPos" array$/;"	m	struct:SR_InHashTable	access:public
+length	SR_HashRegionArray.h	/^    unsigned short length;       \/\/ length of a hash region$/;"	m	struct:HashRegion	access:public
+length	SR_HashRegionArray.h	/^    unsigned short length;$/;"	m	struct:BestRegion	access:public
+length	SR_Reference.h	/^    uint32_t length;              \/\/ length of the chromosome$/;"	m	struct:SR_Reference	access:public
+main	test.c	/^int main(int argc, char *argv[])$/;"	f	signature:(int argc, char *argv[])
+md5	SR_InHashTable.h	/^    char md5[MD5_STR_LEN + 1];     \/\/ md5 checksum string$/;"	m	struct:SR_InHashTable	access:public
+md5	SR_Reference.h	/^    char  md5[MD5_STR_LEN + 1];   \/\/ md5 checksum string$/;"	m	struct:SR_Reference	access:public
+numHashes	SR_InHashTable.h	/^    uint32_t  numHashes;           \/\/ total number of different hashes$/;"	m	struct:SR_InHashTable	access:public
+numPos	SR_HashRegionArray.h	/^    unsigned short numPos;$/;"	m	struct:BestRegion	access:public
+numPos	SR_InHashTable.h	/^    uint32_t  numPos;              \/\/ total number of hash positions found in reference$/;"	m	struct:SR_InHashTable	access:public
+pBestCloseRegions	SR_HashRegionTable.h	/^    BestRegionArray* pBestCloseRegions;    \/\/ an array hold the best hash regions within the closer search region$/;"	m	struct:HashRegionTable	access:public
+pBestFarRegions	SR_HashRegionTable.h	/^    BestRegionArray* pBestFarRegions;      \/\/ an array hold the best hash regions within the further search region$/;"	m	struct:HashRegionTable	access:public
+pCurrRegions	SR_HashRegionTable.h	/^    HashRegionArray* pCurrRegions;        \/\/ an array hold the hash regions that start at current bp$/;"	m	struct:HashRegionTable	access:public
+pPrevRegions	SR_HashRegionTable.h	/^    HashRegionArray* pPrevRegions;         \/\/ an array hold the hash regions that start at 1bp before$/;"	m	struct:HashRegionTable	access:public
+pname	SR_Error.c	/^char *pname = NULL;		\/\/ caller can set this from argv[0] $/;"	v
+query	SR_HashRegionTable.h	/^    const char* query;              \/\/ sequencing read$/;"	m	struct:QueryRegion	access:public
+queryBegin	SR_HashRegionArray.h	/^    unsigned short queryBegin;   \/\/ begin position of a hash region at a read$/;"	m	struct:HashRegion	access:public
+queryBegin	SR_HashRegionArray.h	/^    unsigned short queryBegin;$/;"	m	struct:BestRegion	access:public
+queryLen	SR_HashRegionTable.h	/^    unsigned short queryLen;        \/\/ length of the read$/;"	m	struct:QueryRegion	access:public
+refBegin	SR_HashRegionArray.h	/^    uint32_t       refBegin;     \/\/ begin position of a hash region at the reference$/;"	m	struct:HashRegion	access:public
+refBegin	SR_HashRegionTable.h	/^    uint32_t refBegin;              \/\/ the beginning position of search region for the first partial alignment (closer to the anchor mate)$/;"	m	struct:QueryRegion	access:public
+refBegins	SR_HashRegionArray.h	/^    uint32_t refBegins[MAX_BEST_REF_BEGINS];$/;"	m	struct:BestRegion	access:public
+searchBegin	SR_HashRegionTable.h	/^    unsigned int searchBegin;              \/\/ lower limit in searching the prevHashArray$/;"	m	struct:HashRegionTable	access:public
+sequence	SR_Reference.h	/^    char* sequence;               \/\/ reference sequence$/;"	m	struct:SR_Reference	access:public
+size	SR_HashRegionArray.h	/^    unsigned int size;     \/\/ size of the array$/;"	m	struct:HashRegionArray	access:public
+size	SR_HashRegionArray.h	/^    unsigned int size;$/;"	m	struct:BestRegionArray	access:public
+size	SR_InHashTable.h	/^    unsigned int size;        \/\/ total number of hash position found in the reference for a certain hash $/;"	m	struct:HashPosView	access:public
+uint32	md5.h	/^typedef unsigned int uint32;$/;"	t
