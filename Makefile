@@ -1,7 +1,7 @@
 $(shell mkdir -p ../obj)
 $(shell mkdir -p ../bin)
 
-
+export ECHO=/bin/echo
 export SRC_DIR := $(shell pwd)
 export OBJ_DIR := $(subst src,obj,$(SRC_DIR))
 export BIN_DIR := $(subst src,bin,$(SRC_DIR))
@@ -31,7 +31,7 @@ dep:
 
 SR_Build: $(BUILD_OBJ)
 	$(CC) $(CFLAGS) $(INCLUDES) -g -o $(BIN_DIR)/SR_Build $(SR_BUILD_OBJ)
-	@echo "\n"
+	@$(ECHO) -e "\n"
 
 
 -include $(SR_BUILD_DEP)
