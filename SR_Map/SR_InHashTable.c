@@ -54,7 +54,7 @@ void SR_InHashTableFree(SR_InHashTable* pHashTable)
     }
 }
 
-Bool SR_InHashTableRead(SR_InHashTable* pHashTable, FILE* hashTableInput)
+SR_Bool SR_InHashTableRead(SR_InHashTable* pHashTable, FILE* hashTableInput)
 {
     size_t readSize = 0;
 
@@ -90,7 +90,7 @@ Bool SR_InHashTableRead(SR_InHashTable* pHashTable, FILE* hashTableInput)
 }
 
 
-Bool SR_InHashTableSearch(HashPosView* hashPosView, const SR_InHashTable* pHashTable, uint32_t hashKey)
+SR_Bool SR_InHashTableSearch(HashPosView* hashPosView, const SR_InHashTable* pHashTable, uint32_t hashKey)
 {
     if(hashKey >= pHashTable->numHashes)
         SR_ErrSys("ERROR: Invalid hash key.\n");
