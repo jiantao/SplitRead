@@ -68,16 +68,16 @@ SR_Reference* SR_ReferenceAlloc(uint32_t capacity);
 void SR_ReferenceFree(SR_Reference* reference);
 
 // read the reference sequence in the fasta file line by line, one chromosome at each time
-Bool SR_ReferenceLoad(SR_Reference* reference, unsigned char* nextChr, FILE* faInput);
+SR_Bool SR_ReferenceLoad(SR_Reference* reference, unsigned char* nextChr, FILE* faInput);
 
 // skip the reference sequence with unknown chromosome ID
-Bool SR_ReferenceSkip(unsigned char* nextChr, FILE* faInput);
+SR_Bool SR_ReferenceSkip(unsigned char* nextChr, FILE* faInput);
 
 // write the reference sequence into a output file in the binary format
 off_t SR_ReferenceWrite(FILE* refOutput, const SR_Reference* reference);
 
 // read the reference sequence from an input file in the binary format
-Bool SR_ReferenceRead(SR_Reference* reference, FILE* refInput);
+SR_Bool SR_ReferenceRead(SR_Reference* reference, FILE* refInput);
 
 
 

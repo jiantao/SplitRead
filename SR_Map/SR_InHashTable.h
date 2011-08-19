@@ -82,9 +82,9 @@ void SR_InHashTableFree(SR_InHashTable* pHashTable);
 // Non-constant methods
 //===============================
 
-Bool SR_InHashTableRead(SR_InHashTable* pHashTable, FILE* hashTableInput);
+SR_Bool SR_InHashTableRead(SR_InHashTable* pHashTable, FILE* hashTableInput);
 
-Bool SR_InHashTableSearch(HashPosView* hashPosView, const SR_InHashTable* pHashTable, uint32_t hashKey);
+SR_Bool SR_InHashTableSearch(HashPosView* hashPosView, const SR_InHashTable* pHashTable, uint32_t hashKey);
 
 
 #endif  /*SR_INHASHTABLE_H*/

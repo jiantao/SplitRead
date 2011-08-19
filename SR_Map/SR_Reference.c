@@ -157,7 +157,7 @@ void SR_ReferenceFree(SR_Reference* reference)
 }
 
 // read the reference sequence in the fasta file line by line, one chromosome at each time
-Bool SR_ReferenceLoad(SR_Reference* reference, unsigned char* nextChr, FILE* faInput)
+SR_Bool SR_ReferenceLoad(SR_Reference* reference, unsigned char* nextChr, FILE* faInput)
 {
     char buff[MAX_REF_LINE];
 
@@ -202,7 +202,7 @@ Bool SR_ReferenceLoad(SR_Reference* reference, unsigned char* nextChr, FILE* faI
 }
 
 // skip the reference sequence with unknown chromosome ID
-Bool SR_ReferenceSkip(unsigned char* nextChr, FILE* faInput)
+SR_Bool SR_ReferenceSkip(unsigned char* nextChr, FILE* faInput)
 {
 
     char buff[MAX_REF_LINE];
@@ -251,7 +251,7 @@ off_t SR_ReferenceWrite(FILE* refOutput, const SR_Reference* reference)
 }
 
 // read the reference sequence from an input file in the binary format
-Bool SR_ReferenceRead(SR_Reference* reference, FILE* refInput)
+SR_Bool SR_ReferenceRead(SR_Reference* reference, FILE* refInput)
 {
     size_t readSize = 0;
 
@@ -271,6 +271,16 @@ Bool SR_ReferenceRead(SR_Reference* reference, FILE* refInput)
     readSize = fread(&(reference->length), sizeof(uint32_t), 1, refInput);
     if (readSize != 1)
         SR_ErrSys("ERROR: Cannot read chromosome length from the reference file.\n");
+
+    if (reference->length > reference->capacity)
+    {
+        reference->capacity = reference->length;
+
+        free(reference->sequence);
+        reference->sequence = (char*) malloc(sizeof(char) * reference->capacity);
+        if (reference->sequence == NULL)
+            SR_ErrQuit("ERROR: Not enough memory for reference sequence.\n");
+    }
 
     readSize = fread(reference->sequence, sizeof(char), reference->length, refInput);
     if (readSize != reference->length)
