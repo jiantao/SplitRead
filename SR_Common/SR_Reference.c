@@ -272,6 +272,16 @@ Bool SR_ReferenceRead(SR_Reference* reference, FILE* refInput)
     if (readSize != 1)
         SR_ErrSys("ERROR: Cannot read chromosome length from the reference file.\n");
 
+    if (reference->length > reference->capacity)
+    {
+        reference->capacity = reference->length;
+
+        free(reference->sequence);
+        reference->sequence = (char*) malloc(sizeof(char) * reference->capacity);
+        if (reference->sequence == NULL)
+            SR_ErrQuit("ERROR: Not enough memory for reference sequence.\n");
+    }
+
     readSize = fread(reference->sequence, sizeof(char), reference->length, refInput);
     if (readSize != reference->length)
         SR_ErrSys("ERROR: Cannot read chromosome sequence from the reference file.\n");
