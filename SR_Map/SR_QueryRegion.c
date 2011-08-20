@@ -73,6 +73,10 @@ void SR_QueryRegionSetSeq(SR_QueryRegion* pQueryRegion, SR_SeqAction action)
 
     if (action == SR_INVERSE)
         pQueryRegion->isOrphanInversed = TRUE;
+    else if (action == SR_REVERSE_COMP)
+        SR_SetStrand(pQueryRegion->pOrphan, SR_REVERSE_COMP);
+    else
+        SR_SetStrand(pQueryRegion->pOrphan, SR_FORWARD);
 
     for (unsigned int i = 0; i != pQueryRegion->pOrphan->core.l_qseq; ++i)
     {
