@@ -66,7 +66,7 @@ static void ResetBestRegions(HashRegionTable* pRegionTable, unsigned short query
 
 
 // calculate the hash key for a hash in a read that starts at a certain position
-static SR_Bool GetNextHashKey(const char* query, unsigned int queryLen, unsigned int* pPos, uint32_t* pHashKey, uint32_t mask, unsigned int hashSize)
+static SR_Bool GetNextHashKey(const char* query, uint32_t queryLen, unsigned int* pPos, uint32_t* pHashKey, uint32_t mask, unsigned int hashSize)
 {
     // table use to translate a nucleotide into its corresponding 2-bit representation
     static const char translation[26] = { 0, -1, 1, -1, -1, -1, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 3, -1, -1, -1, -1, -1, -1 };
@@ -346,7 +346,7 @@ void HashRegionTableReverseBest(HashRegionTable* pRegionTable)
 
 
 // initialize the hash region table for a new query
-void HashRegionTableInit(HashRegionTable* pRegionTable, unsigned short queryLen)
+void HashRegionTableInit(HashRegionTable* pRegionTable, uint32_t queryLen)
 {
     SR_ARRAY_RESET(pRegionTable->pPrevRegions);
     SR_ARRAY_RESET(pRegionTable->pCurrRegions);

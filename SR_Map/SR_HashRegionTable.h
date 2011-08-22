@@ -80,7 +80,7 @@ void HashRegionTableLoad(HashRegionTable* pRegionTable, const SR_InHashTable* pH
 //      1. pRegionTable: a pointer to a hash region table
 //      2. queryLen: length of the query
 //==========================================================
-void HashRegionTableInit(HashRegionTable* pRegionTable, unsigned short queryLen);
+void HashRegionTableInit(HashRegionTable* pRegionTable, uint32_t queryLen);
 
 //===========================================================
 // function:
