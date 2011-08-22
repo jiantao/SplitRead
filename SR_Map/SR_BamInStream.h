@@ -104,13 +104,16 @@ SR_Status SR_BamInStreamRead(bam1_t* pAlignment, SR_BamInStream* pBamInStream);
 //      1. ppAnchor: a pointer of pointer to the anchor mate
 //      2. ppOrphan: a pointer of pointer to the orphan mate
 //      3. pBamInStream : a pointer to an bam instream structure
+//      4. scTolerance: soft clipping tolerance, any reads whose 
+//                      soft clipping rates are greater than this 
+//                      value will be considered as an unaligned read.
 //
 // return:
 //      if we get a unique-orphan pair, return SR_OK; if we reach
 //      the end of file, return SR_EOF; if we finish the current
 //      chromosome, return SR_OUT_OF_RANGE; else, return SR_ERR
 //================================================================
-SR_Status SR_BamInStreamGetPair(bam1_t** ppAnchor, bam1_t** ppOrphan, SR_BamInStream* pBamReadAux);
+SR_Status SR_BamInStreamGetPair(bam1_t** ppAnchor, bam1_t** ppOrphan, SR_BamInStream* pBamReadAux, double scTolerance);
 
 
 #endif  /*SR_BAMINSTREAM_H*/

@@ -43,6 +43,7 @@
 typedef struct HashPosView
 {
     const uint32_t* data;     // the address where a certain hash start in the "hashPos" array in the "SR_InHashTable" object 
+
     unsigned int size;        // total number of hash position found in the reference for a certain hash 
 
 }HashPosView;

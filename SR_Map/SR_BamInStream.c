@@ -35,6 +35,9 @@
 // default capacity of a bam array
 #define DEFAULT_BAM_ARRAY_CAP 30
 
+// default soft clipping tolerance
+#define DEFAULT_SC_TOLERANCE 0.2
+
 // a mask used to filter out those unwanted reads for split alignments
 // it includes proper paired reads, secondar reads, qc-failed reads and duplicated reads
 #define SR_BAM_FMASK (BAM_FPROPER_PAIR | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP)
@@ -245,7 +248,7 @@ SR_Status SR_BamInStreamRead(bam1_t* pAlignment, SR_BamInStream* pBamInStream)
 }
 
 // load a unique-orphan pair from a bam file
-SR_Status SR_BamInStreamGetPair(bam1_t** ppAnchor, bam1_t** ppOrphan, SR_BamInStream* pBamInStream)
+SR_Status SR_BamInStreamGetPair(bam1_t** ppAnchor, bam1_t** ppOrphan, SR_BamInStream* pBamInStream, double scTolerance)
 {
     int ret = 1;
 
