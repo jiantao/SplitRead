@@ -37,7 +37,7 @@ typedef struct SR_BamInStreamPrvt SR_BamInStream;
 // Constructors and Destructors
 //===============================
 
-SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename);
+SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, double scTolerance);
 
 void SR_BamInStreamFree(SR_BamInStream* pBamInStream);
 
@@ -98,22 +98,31 @@ SR_Status SR_BamInStreamRead(bam1_t* pAlignment, SR_BamInStream* pBamInStream);
 
 //================================================================
 // function:
+//      get the current reference ID
+//
+// args:
+//      1. pBamInStream: a pointer to an bam instream structure
+// 
+// return:
+//      reference ID
+//================================================================ 
+int32_t SR_BamInStreamGetRefID(const SR_BamInStream* pBamInStream);
+
+//================================================================
+// function:
 //      load a unique-orphan pair from the bam file
 //
 // args:
 //      1. ppAnchor: a pointer of pointer to the anchor mate
 //      2. ppOrphan: a pointer of pointer to the orphan mate
 //      3. pBamInStream : a pointer to an bam instream structure
-//      4. scTolerance: soft clipping tolerance, any reads whose 
-//                      soft clipping rates are greater than this 
-//                      value will be considered as an unaligned read.
 //
 // return:
 //      if we get a unique-orphan pair, return SR_OK; if we reach
 //      the end of file, return SR_EOF; if we finish the current
 //      chromosome, return SR_OUT_OF_RANGE; else, return SR_ERR
 //================================================================
-SR_Status SR_BamInStreamGetPair(bam1_t** ppAnchor, bam1_t** ppOrphan, SR_BamInStream* pBamReadAux, double scTolerance);
+SR_Status SR_BamInStreamGetPair(bam1_t** ppAnchor, bam1_t** ppOrphan, SR_BamInStream* pBamInStream);
 
 
 #endif  /*SR_BAMINSTREAM_H*/
