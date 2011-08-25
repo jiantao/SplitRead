@@ -39,8 +39,6 @@ typedef struct SR_BamHeader
 
     const char** pMD5s;
 
-    unsigned int numMD5;
-
 }SR_BamHeader;
 
 //===============================
@@ -70,7 +68,7 @@ void SR_BamHeaderFree(SR_BamHeader* pBamHeader);
 // return:
 //      number of references (chromosomes)
 //=============================================================== 
-inline int32_t SR_BamHeaderGetNum(const SR_BamHeader* pBamHeader)
+inline int32_t SR_BamHeaderGetRefNum(const SR_BamHeader* pBamHeader)
 {
     return (pBamHeader->pOrigHeader->n_targets);
 }

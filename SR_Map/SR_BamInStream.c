@@ -363,10 +363,19 @@ SR_BamHeader* SR_BamInStreamLoadHeader(SR_BamInStream* pBamInStream)
     if (pBamHeader->pMD5s == NULL)
         SR_ErrQuit("ERROR: Not enough memory for md5 string");
 
-    pBamHeader->numMD5 = 0;
-    for (const char* md5Pos = pOrigHeader->text; (md5Pos = strstr(md5Pos, "M5:")) != NULL; ++(pBamHeader->numMD5), ++md5Pos)
+    unsigned int numMD5 = 0;
+    for (const char* md5Pos = pOrigHeader->text; numMD5 <= pOrigHeader->n_targets && (md5Pos = strstr(md5Pos, "M5:")) != NULL; ++numMD5, ++md5Pos)
     {
-        pBamHeader->pMD5s[pBamHeader->numMD5] = md5Pos + 3;
+        pBamHeader->pMD5s[numMD5] = md5Pos + 3;
+    }
+
+    if (numMD5 != pOrigHeader->n_targets)
+    {
+        free(pBamHeader->pMD5s);
+        pBamHeader->pMD5s = NULL;
+
+        if (numMD5 != 0)
+            SR_ErrMsg("WARNING: Number of MD5 string is not consistent with number of chromosomes.");
     }
 
     return pBamHeader;

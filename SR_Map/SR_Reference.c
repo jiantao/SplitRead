@@ -25,6 +25,20 @@
 #include "SR_Error.h"
 #include "SR_Reference.h"
 
+// maximum number of character will be load in a line from the fasta file
+#define MAX_REF_LINE 1024
+
+// number of characters can be held in a reference object
+// this value assure that the largest chromosome in the human reference, chromsome 1, can be
+// load into the object without any reallocation.
+#define DEFAULT_REF_CAP 300000000
+
+// the default start chromosome ID
+#define DEFAULT_START_CHR 1
+
+// the default reference name capacity
+#define DEFAULT_REF_NAME_CAP 100
+
 // process a line of reference sequence
 static const char* ProcessRefLine(unsigned short* len, char* buff)
 {
@@ -121,25 +135,24 @@ static void SetMd5(SR_Reference* reference)
 
 
 // create a new reference object
-SR_Reference* SR_ReferenceAlloc(uint32_t capacity)
+SR_Reference* SR_ReferenceAlloc(void)
 {
     SR_Reference* newRef = (SR_Reference*) malloc(sizeof(SR_Reference));
     if (newRef == NULL)
         SR_ErrSys("ERROR: Not enough memory for a reference object.\n");
 
-    if (capacity == 0)
-    {
-        SR_ErrMsg("WARNING: Capacity of reference sequence should be greater than zero. A default value %d will be used.\n", DEFAULT_REF_CAPACITY);
-        capacity = DEFAULT_REF_CAPACITY;
-    }
-
-    newRef->sequence = (char*) malloc(sizeof(char) * capacity);
+    newRef->sequence = (char*) malloc(sizeof(char) * DEFAULT_REF_CAP);
     if (newRef->sequence == NULL)
         SR_ErrSys("ERROR: Not enough memory for the storage of sequence in a reference object.\n");
 
-    newRef->chr = 0;
-    newRef->length = 0;
-    newRef->capacity = capacity;
+    newRef->name = (char*) calloc(DEFAULT_REF_NAME_CAP * sizeof(char));
+    if (newRef->name == NULL)
+        SR_ErrSys("ERROR: Not enough memory for the storage of the reference name in a reference object.\n");
+
+    newRef->id = 0;
+    newRef->seqLen = 0;
+    newRef->nameCap = DEFAULT_REF_NAME_CAP;
+    newRef->seqCap = DEFAULT_REF_CAP;
     newRef->md5[MD5_STR_LEN] = '\0';
 
     return newRef;
@@ -151,6 +164,7 @@ void SR_ReferenceFree(SR_Reference* reference)
     if (reference != NULL)
     {
         free(reference->sequence);
+        free(reference->name);
 
         free(reference);
     }
