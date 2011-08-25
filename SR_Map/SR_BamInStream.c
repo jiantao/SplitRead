@@ -268,6 +268,26 @@ void SR_BamInStreamFree(SR_BamInStream* pBamInStream)
     }
 }
 
+SR_BamHeader* SR_BamHeaderAlloc(void)
+{
+    SR_BamHeader* pNewHeader = (SR_BamHeader*) calloc(1, sizeof(SR_BamHeader));
+    if (pNewHeader == NULL)
+        SR_ErrQuit("ERROR: Not enough memory for a bam header object");
+
+    return pNewHeader;
+}
+
+void SR_BamHeaderFree(SR_BamHeader* pBamHeader)
+{
+    if (pBamHeader != NULL)
+    {
+        free(pBamHeader->pMD5s);
+        bam_header_destroy(pBamHeader->pOrigHeader);
+
+        free(pBamHeader);
+    }
+}
+
 //======================
 // Interface functions
 //======================
@@ -329,9 +349,27 @@ SR_Status SR_BamInStreamJump(SR_BamInStream* pBamInStream, int32_t refID)
 }
 
 // read the header of a bam file
-bam_header_t* SR_BamInStreamReadHeader(SR_BamInStream* pBamInStream)
+SR_BamHeader* SR_BamInStreamLoadHeader(SR_BamInStream* pBamInStream)
 {
-    return bam_header_read(pBamInStream->fpBamInput);
+    bam_header_t* pOrigHeader = bam_header_read(pBamInStream->fpBamInput);
+    if (pOrigHeader == NULL)
+        return NULL;
+
+    SR_BamHeader* pBamHeader = SR_BamHeaderAlloc();
+
+    pBamHeader->pOrigHeader = pOrigHeader;
+
+    pBamHeader->pMD5s = (const char**) calloc(pOrigHeader->n_targets, sizeof(char*));
+    if (pBamHeader->pMD5s == NULL)
+        SR_ErrQuit("ERROR: Not enough memory for md5 string");
+
+    pBamHeader->numMD5 = 0;
+    for (const char* md5Pos = pOrigHeader->text; (md5Pos = strstr(md5Pos, "M5:")) != NULL; ++(pBamHeader->numMD5), ++md5Pos)
+    {
+        pBamHeader->pMD5s[pBamHeader->numMD5] = md5Pos + 3;
+    }
+
+    return pBamHeader;
 }
 
 // read an alignment from a bam file
