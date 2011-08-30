@@ -35,17 +35,16 @@ int main(int argc, char *argv[])
     SR_Build_SetPars(&buildPars, argc, argv);
 
     // write the hash size to the beginning of hash position index file and hash position file
-    WriteHashSize(buildPars.hashTableOutput, buildPars.hashSize);
+    SR_ReferenceLeaveStart(buildPars.refOutput);
+    SR_OutHashTableWriteStart(buildPars.hashSize, buildPars.hashTableOutput);
 
     // create the reference object and the reference hash table object
-    SR_Reference* reference = SR_ReferenceAlloc(DEFAULT_REF_CAPACITY);
+    SR_Reference* reference = SR_ReferenceAlloc();
+    SR_RefHeader* refHeader = SR_RefHeaderAlloc();
     SR_OutHashTable* refHashTable = SR_OutHashTableAlloc(buildPars.hashSize);
 
-    // next chromosome ID in the reference input file
-    unsigned char nextChr = DEFAULT_START_CHR;
-
     // a indicator of the end of the input reference file
-    Bool keepLoading = TRUE;
+    SR_Bool keepLoading = FALSE;
 
     // read the reference sequence from the fasta file chromosome by chromosome and store it in the reference object
     // index the referen sequence with the user-specified hash size and store the hash positions in the hash position file
@@ -57,45 +56,45 @@ int main(int argc, char *argv[])
         // when it hits the '>' character at the beginning of a line it will set the nextChr variable and return TRUE
         // when it hist the eof it will return FALSE
 
-        if (nextChr != INVALID_CHR_ID)
-            keepLoading = SR_ReferenceLoad(reference, &nextChr, buildPars.faInput);
-        else
+        if (keepLoading && refHeader->names[refHeader->numRefs] == NULL)
         {
-            SR_ErrMsg("WARNING: Found unrecognized chromosome ID. This chromosome will be skipped.\n");
-            keepLoading = SR_ReferenceSkip(&nextChr, buildPars.faInput);
-        }
-
-        // we won't get any sequence in the first round or any chromosome with an unknown ID
-        // so here we skip the following steps
-        if (reference->length == 0)
-        {
-            reference->chr = nextChr;
+            SR_ReferenceReset(reference);
+            keepLoading = SR_ReferenceSkip(refHeader, buildPars.faInput);
             continue;
         }
 
+        keepLoading = SR_ReferenceLoad(reference, refHeader, buildPars.faInput);
+
+
+        // we won't get any sequence in the first round or any chromosome with an unknown ID
+        // so here we skip the following steps
+        if (reference->seqLen == 0)
+            continue;
+
         // index every possible hash position in the current chromosome
         // and write the results into hash position index file and hash position file
-        SR_OutHashTableLoad(refHashTable, reference->md5, reference->sequence, reference->length, reference->chr);
-        off_t hsFileOffset = SR_OutHashTableWrite(buildPars.hashTableOutput, refHashTable);
+        SR_OutHashTableLoad(refHashTable, reference->sequence, reference->seqLen, reference->id);
+        int64_t htFileOffset = SR_OutHashTableWrite(refHashTable, buildPars.hashTableOutput);
         // reset the reference hash table object for next loading
         SR_OutHashTableReset(refHashTable);
 
         // write the reference sequence of current chromosome into the reference output file
-        off_t refFileOffset = SR_ReferenceWrite(buildPars.refOutput, reference);
+        int64_t refFileOffset = SR_ReferenceWrite(reference, buildPars.refOutput);
         // reset the reference object for next reading
+        SR_ReferenceReset(reference);
 
-        // if offset file of reference and hash table is specified 
-        // we write the offset position of each chromosome into the offset file.
-        if (buildPars.offsetOutput != NULL)
-            fprintf(buildPars.offsetOutput, "%u\t%lu\t%lu\n", reference->chr, refFileOffset, hsFileOffset);
-
-        SR_ReferenceReset(reference, nextChr);
-
+        refHeader->refFilePos[refHeader->numRefs - 1] = refFileOffset;
+        refHeader->htFilePos[refHeader->numRefs - 1] = htFileOffset;
 
     }while(keepLoading);
 
+    
+    int64_t refHeaderPos = SR_RefHeaderWrite(refHeader, buildPars.refOutput);
+    SR_ReferenceSetStart(refHeaderPos, buildPars.refOutput);
+    SR_OutHashTableSetStart(refHeaderPos, buildPars.hashTableOutput);
+
     // close the open files and free the allocated memory for objects
-    SR_Build_Clean(reference, refHashTable, &buildPars);
+    SR_Build_Clean(reference, refHeader, refHashTable, &buildPars);
 
     return EXIT_SUCCESS;
 }

@@ -22,11 +22,33 @@
 #include "SR_Error.h"
 #include "SR_Build_GetOpt.h"
 
+// total number of arguments we should expect for the split-read build program
+#define OPT_BUILD_TOTAL_NUM 5
+
+// total number of required arguments we should expect for the split-read build program
+#define OPT_BUILD_REQUIRED_NUM 4
+
+// the index of show help in the option object array
+#define OPT_HELP            0
+
+// the index of the fasta input file in the option object array
+#define OPT_FA_INPUT_FILE   1
+
+// the index of the reference output file in the option object array
+#define OPT_REF_OUTPUT_FILE 2
+
+// the index of the output hash table file in the option object array
+#define OPT_HASH_TABLE_FILE 3
+
+// the index of the hash size in the option object array
+#define OPT_HASH_SIZE       4
+
+
 // get the options from command line arguemnts
 int SR_GetOpt(SR_Option opts[], int argc, char* argv[])
 {
     int optNum = 0;
-    Bool hasParsed = FALSE;
+    SR_Bool hasParsed = FALSE;
 
     for (unsigned int i = 1; i < argc; ++i)
     {
@@ -77,7 +99,6 @@ void SR_Build_SetPars(SR_Build_Pars* pars, int argc, char* argv[])
         {"ro",   NULL, FALSE},
         {"hto",  NULL, FALSE},
         {"hs",   NULL, FALSE},
-        {"oft",  NULL, FALSE},
         {NULL,   NULL, FALSE}
     };
 
@@ -127,21 +148,6 @@ void SR_Build_SetPars(SR_Build_Pars* pars, int argc, char* argv[])
                     SR_ErrQuit("ERROR: Invalid hash size. Hash size should be greater than zero and less than %d.\n", MAX_HASH_SIZE);
 
                 break;
-            case OPT_OFFSET_FILE:
-                if (opts[i].isFound)
-                {
-                    if (opts[i].value != NULL)
-                        pars->offsetOutput = fopen(opts[i].value, "wb");
-                    else
-                        pars->offsetOutput = fopen(DEFAULT_OFFSET_FILE_NAME, "wb");
-
-                    if (pars->offsetOutput == NULL)
-                        SR_ErrMsg("WARNING: Cannot open offset position file for writing. No offset position file will be generated.\n");
-                }
-                else
-                    pars->offsetOutput = NULL;
-
-                break;
             default:
                 SR_ErrQuit("ERROR: Unrecognized argument.\n");
                 break;
@@ -155,23 +161,23 @@ void SR_Build_SetPars(SR_Build_Pars* pars, int argc, char* argv[])
 // show the help message and quit
 void SR_Build_ShowHelp(void)
 {
-    printf("Usage: SR_Build -fi <input_fasta_file> -ro <reference_output_file> -hto <hash_table_output_file> -hs <hash_size> -oft [offset_file]\n");
+    printf("Usage: SR_Build -fi <input_fasta_file> -ro <reference_output_file> -hto <hash_table_output_file> -hs <hash_size>\n");
     printf("Read in the reference file in fasta file and ouput the SR format reference file and hash table file.\n\n");
 
     printf("-fi       input reference file in fasta format\n");
     printf("-ro       output reference file in \"SR\" format\n");
     printf("-hto      output hash table file.\n");
     printf("-hs       hash size parameter(1 - %d)\n", MAX_HASH_SIZE);
-    printf("-oft      output offset file for chromsome jump\n");
-    printf("-help     display help message and exit\n");
+    printf("-help     display help message and exit\n\n");
 
     exit(EXIT_SUCCESS);
 }
 
 // clean up the resouses used in the split-read build program
-void SR_Build_Clean(SR_Reference* reference, SR_OutHashTable* refHashTable, SR_Build_Pars* buildPars)
+void SR_Build_Clean(SR_Reference* reference, SR_RefHeader* refHeader, SR_OutHashTable* refHashTable, SR_Build_Pars* buildPars)
 {
     SR_ReferenceFree(reference);
+    SR_RefHeaderFree(refHeader);
     SR_OutHashTableFree(refHashTable);
 
     fclose(buildPars->faInput);

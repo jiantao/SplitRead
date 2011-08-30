@@ -20,11 +20,14 @@
 #include <string.h>
 #include <assert.h>
 
-#include "SR_Error.h"
+#include "SR_Utilities.h"
 #include "SR_OutHashTable.h"
 
+#define DEFAULT_HASH_SIZE 7
+#define DEFAULT_POS_ARR_CAPACITY 2000
+
 // calculate the hash key for a hash in a read that starts at a certain position
-static Bool GetNextHashKey(uint32_t* hashKey, uint32_t* pos, const char* query, uint32_t queryLen, uint32_t mask, unsigned char hashSize)
+static SR_Bool GetNextHashKey(uint32_t* hashKey, uint32_t* pos, const char* query, uint32_t queryLen, uint32_t mask, unsigned char hashSize)
 {
     // table use to translate a nucleotide into its corresponding 2-bit representation
     static const char translation[26] = { 0, -1, 1, -1, -1, -1, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 3, -1, -1, -1, -1, -1, -1 };
@@ -72,8 +75,8 @@ SR_HashPosArray* SR_HashPosArrayAlloc(unsigned int capacity)
     if (capacity == 0)
         capacity = DEFAULT_POS_ARR_CAPACITY;
 
-    newArray->hashPos = (uint32_t*) malloc(sizeof(uint32_t) * capacity);
-    if (newArray->hashPos == NULL)
+    newArray->data = (uint32_t*) malloc(sizeof(uint32_t) * capacity);
+    if (newArray->data == NULL)
         SR_ErrSys("ERROR: Not enough memory for the storage of hash positions in a hash position array object.\n");
 
     newArray->size = 0;
@@ -89,8 +92,8 @@ void SR_HashPosArrayInit(SR_HashPosArray* hashPosArray, unsigned int capacity)
     if (capacity == 0)
         capacity = DEFAULT_POS_ARR_CAPACITY;
 
-    hashPosArray->hashPos = (uint32_t*) malloc(sizeof(uint32_t) * capacity);
-    if (hashPosArray->hashPos == NULL)
+    hashPosArray->data = (uint32_t*) malloc(sizeof(uint32_t) * capacity);
+    if (hashPosArray->data == NULL)
         SR_ErrSys("ERROR: Not enough memory for the storage of hash positions in a hash position array object.\n");
 
     hashPosArray->size = 0;
@@ -101,7 +104,7 @@ void SR_HashPosArrayFree(SR_HashPosArray* hashPosArray)
 {
     if (hashPosArray != NULL)
     {
-        free(hashPosArray->hashPos);
+        free(hashPosArray->data);
 
         free(hashPosArray);
     }
@@ -112,12 +115,12 @@ void SR_HashPosArrayPushBack(SR_HashPosArray* hashPosArray, uint32_t pos)
     if (hashPosArray->size == hashPosArray->capacity)
     {
         hashPosArray->capacity *= 2;
-        hashPosArray->hashPos = (uint32_t*) realloc(hashPosArray->hashPos, sizeof(uint32_t) * hashPosArray->capacity);
-        if (hashPosArray->hashPos == NULL)
+        hashPosArray->data = (uint32_t*) realloc(hashPosArray->data, sizeof(uint32_t) * hashPosArray->capacity);
+        if (hashPosArray->data == NULL)
             SR_ErrSys("ERROR: Not enough memory for the storage of hash positions in a hash position array object.\n");
     }
 
-    SR_HashPosArrayGet(hashPosArray, hashPosArray->size) = pos;
+    SR_ARRAY_GET(hashPosArray, hashPosArray->size) = pos;
     ++(hashPosArray->size);
 }
 
@@ -135,9 +138,8 @@ SR_OutHashTable* SR_OutHashTableAlloc(unsigned char hashSize)
     if (newTable == NULL)
         SR_ErrSys("ERROR: Not enough memory for a reference hash table object.\n");
     
-    newTable->chr = 0;
+    newTable->id = 0;
     newTable->hashSize = hashSize;
-    newTable->md5[MD5_STR_LEN] = '\0';
     newTable->numPos = 0;
     newTable->numHashes = (uint32_t) 1 << (2 * hashSize);
 
@@ -159,7 +161,7 @@ void SR_OutHashTableFree(SR_OutHashTable* pHashTable)
         if (pHashTable->hashPosTable != NULL)
         {
             for (unsigned int i = 0; i != pHashTable->numHashes; ++i)
-                free((pHashTable->hashPosTable[i]).hashPos);
+                free((pHashTable->hashPosTable[i]).data);
         }
 
         free(pHashTable->hashPosTable);
@@ -167,15 +169,13 @@ void SR_OutHashTableFree(SR_OutHashTable* pHashTable)
     }
 }
 
-void SR_OutHashTableLoad(SR_OutHashTable* pHashTable, const char* md5String, const char* refSeq, uint32_t refLen, unsigned char chr)
+void SR_OutHashTableLoad(SR_OutHashTable* pHashTable, const char* refSeq, uint32_t refLen, int32_t id)
 {
     uint32_t mask = GetHighEndMask(pHashTable->hashSize);
     uint32_t hashKey = 0;
     uint32_t pos = 0;
 
-    pHashTable->chr = chr;
-    strncpy(pHashTable->md5, md5String, MD5_STR_LEN);
-
+    pHashTable->id = id;
     while (GetNextHashKey(&hashKey, &pos, refSeq, refLen, mask, pHashTable->hashSize))
     {
         SR_HashPosArrayPushBack(&((pHashTable->hashPosTable)[hashKey]), pos);
@@ -184,27 +184,22 @@ void SR_OutHashTableLoad(SR_OutHashTable* pHashTable, const char* md5String, con
     }
 }
 
-off_t SR_OutHashTableWrite(FILE* hashTableOutput, const SR_OutHashTable* pHashTable)
+int64_t SR_OutHashTableWrite(const SR_OutHashTable* pHashTable, FILE* htOutput)
 {
-    off_t fileOffset = ftello(hashTableOutput);
+    int64_t fileOffset = ftello(htOutput);
     if (fileOffset == -1)
         SR_ErrSys("ERROR: Cannot get the offset of current file.\n");
 
     size_t writeSize = 0;
 
-    writeSize = fwrite(&(pHashTable->chr), sizeof(unsigned char), 1, hashTableOutput);
+    writeSize = fwrite(&(pHashTable->id), sizeof(int32_t), 1, htOutput);
     if (writeSize != 1)
         SR_ErrSys("ERROR: Cannot write the chromosome ID to the hash table file.\n");
-
-    writeSize = fwrite(pHashTable->md5, sizeof(char), MD5_STR_LEN, hashTableOutput);
-    if (writeSize != MD5_STR_LEN)
-        SR_ErrSys("ERROR: Cannot write the md5 string to the hash table file.\n");
-
 
     uint32_t index = 0;
     for (unsigned int i = 0; i != pHashTable->numHashes; ++i)
     {
-        writeSize = fwrite(&index, sizeof(uint32_t), 1, hashTableOutput);
+        writeSize = fwrite(&index, sizeof(uint32_t), 1, htOutput);
         if (writeSize != 1)
             SR_ErrSys("ERROR: Cannot write hash position index to the hash table file.\n");
 
@@ -212,35 +207,65 @@ off_t SR_OutHashTableWrite(FILE* hashTableOutput, const SR_OutHashTable* pHashTa
         index += hashPosSize;
     }
 
-    writeSize = fwrite(&(pHashTable->numPos), sizeof(uint32_t), 1, hashTableOutput);
+    writeSize = fwrite(&(pHashTable->numPos), sizeof(uint32_t), 1, htOutput);
     if (writeSize != 1)
         SR_ErrSys("ERROR: Cannot write the total number of hash positions to the hash table file.\n");
 
     for (unsigned int i = 0; i != pHashTable->numHashes; ++i)
     {
-        const uint32_t* hashPos = (pHashTable->hashPosTable)[i].hashPos;
+        const uint32_t* hashPos = (pHashTable->hashPosTable)[i].data;
         uint32_t hashPosSize = (pHashTable->hashPosTable)[i].size;
 
-        writeSize = fwrite(hashPos, sizeof(uint32_t), hashPosSize, hashTableOutput);
+        writeSize = fwrite(hashPos, sizeof(uint32_t), hashPosSize, htOutput);
         if (writeSize != hashPosSize)
             SR_ErrSys("ERROR: Cannot write hash position to the hash table file.\n");
 
     }
 
-    fflush(hashTableOutput);
+    fflush(htOutput);
 
     return fileOffset;
+}
+
+void SR_OutHashTableWriteStart(unsigned char hashSize, FILE* htOutput)
+{
+    size_t writeSize = 0;                                                                
+    int64_t emptyOffset = 0;
+
+    writeSize = fwrite(&emptyOffset, sizeof(emptyOffset), 1, htOutput);
+    if (writeSize != 1)                                                                  
+        SR_ErrQuit("ERROR: Cannot write the offset of reference header into hash table file.\n");
+
+    writeSize = fwrite(&(hashSize), sizeof(unsigned char), 1, htOutput);           
+    if (writeSize != 1)                                                                  
+        SR_ErrQuit("ERROR: Cannot write the hash size into hash table file.\n");
+
+    fflush(htOutput);
+}
+
+void SR_OutHashTableSetStart(int64_t refHeaderPos, FILE* htOutput)
+{
+    size_t writeSize = 0;                                                                
+
+    if (fseeko(htOutput, 0, SEEK_SET) != 0)
+        SR_ErrQuit("ERROR: Cannot seek in the hash table file.\n");
+
+    writeSize = fwrite(&refHeaderPos, sizeof(refHeaderPos), 1, htOutput);
+    if (writeSize != 1)                                                                  
+        SR_ErrQuit("ERROR: Cannot write the offset of reference header into hash table file.\n");
+
+    fflush(htOutput);
 }
 
 
 void SR_OutHashTableReset(SR_OutHashTable* pHashTable)
 {
-    pHashTable->chr = 0;
+    pHashTable->id = 0;
     pHashTable->numPos = 0;
 
     for (unsigned int i = 0; i != pHashTable->numHashes; ++i)
     {
         SR_HashPosArray* currPosArray = &((pHashTable->hashPosTable)[i]);
-        SR_HashPosArrayReset(currPosArray);
+        SR_ARRAY_RESET(currPosArray);
     }
 }
