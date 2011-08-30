@@ -10,7 +10,7 @@
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  YOUR NAME (), 
+ *         Author:  Jiantao Wu (), 
  *        Company:  
  *
  * =====================================================================================
@@ -68,6 +68,12 @@ typedef struct SR_Reference
     uint32_t seqCap;              // capacity of reference sequence
 
 }SR_Reference;
+
+// get the reference name given the reference ID
+#define SR_RefHeaderGetName(pRefHeader, refID) ((pRefHeader)->names[(refID)])
+
+// get the md5 string (not null terminated) given the reference ID
+#define SR_RefHeaderGetMD5(pRefHeader, refID) ((pRefHeader)->md5s + (refID) * MD5_STR_LEN)
 
 //===============================
 // Constructors and Destructors

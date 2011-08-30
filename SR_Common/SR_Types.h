@@ -42,6 +42,7 @@ typedef enum
     SR_G = 4,
     SR_T = 8,
     SR_N = 15
+
 }SR_Base;
 
 // search direction for query region relative to the positon of anchor mate
@@ -60,7 +61,9 @@ typedef enum
 
     SR_REVERSE_COMP,    // change the sequence to its reverse complement format
 
-    SR_INVERSE          // change the sequence to its inverse format
+    SR_INVERSE,         // change the sequence to its inverse format
+
+    SR_COMP
 
 }SR_SeqAction;
 
@@ -69,12 +72,6 @@ typedef SR_SeqAction SR_Strand;
 #define MD5_CHECKSUM_LEN 16
 
 #define MD5_STR_LEN 32
-
-#define X 23
-
-#define Y 24
-
-#define MT 25
 
 #define MAX_HASH_SIZE 12
 

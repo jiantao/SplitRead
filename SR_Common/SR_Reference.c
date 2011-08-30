@@ -10,7 +10,7 @@
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  YOUR NAME (), 
+ *         Author:  Jiantao Wu (), 
  *        Company:  
  *
  * =====================================================================================
@@ -42,8 +42,10 @@
 // the default start chromosome ID
 #define DEFAULT_START_CHR 1
 
+// the default number of chromosomes
 #define DEFAULT_NUM_CHR 100
 
+// initialize the hash table for reference name
 KHASH_MAP_INIT_STR(refName, int32_t);
 
 
@@ -81,7 +83,7 @@ static const char* ProcessRefLine(unsigned short* len, char* buff)
 }
 
 // process the header line in the fasta file to get the ID for the next chromosome
-static void SR_RefHeaderGetName(SR_RefHeader* pRefHeader, const char* buff)
+static void SR_RefHeaderSetName(SR_RefHeader* pRefHeader, const char* buff)
 {
     // we only accept two formats of header
     // 1) the chromosome ID should closely followed by the '>' character.
@@ -126,7 +128,7 @@ static void SR_RefHeaderSetMd5(SR_RefHeader* pRefHeader, SR_Reference* pRef)
     char* md5String = pRefHeader->md5s + MD5_STR_LEN * pRefHeader->numRefs;
     for (unsigned int i = 0; i != MD5_CHECKSUM_LEN; ++i)
     {
-        sprintf(md5String, "%02x", MD5[i]);
+        sprintf(md5String, "%02X", MD5[i]);
         md5String += 2;
     }
 
@@ -379,7 +381,7 @@ SR_Status SR_ReferenceLoad(SR_Reference* pRef, SR_RefHeader* pRefHeader, FILE* f
     }
 
     if (buff[0] == '>')
-        SR_RefHeaderGetName(pRefHeader, buff);
+        SR_RefHeaderSetName(pRefHeader, buff);
     else if (feof(faInput))
         return SR_EOF;
     else
@@ -397,7 +399,7 @@ SR_Status SR_ReferenceSkip(SR_RefHeader* pRefHeader, FILE* faInput)
         continue;
 
     if (buff[0] == '>')
-        SR_RefHeaderGetName(pRefHeader, buff);
+        SR_RefHeaderSetName(pRefHeader, buff);
     else if (feof(faInput))
         return SR_EOF;
     else
