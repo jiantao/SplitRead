@@ -10,7 +10,7 @@
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  YOUR NAME (), 
+ *         Author:  Jiantao Wu (), 
  *        Company:  
  *
  * =====================================================================================
@@ -43,7 +43,7 @@ typedef struct HashPosView
 // input format of reference hash table
 typedef struct SR_InHashTable
 {
-    int32_t id;             // chromosome of the current reference hash table
+    int32_t id;                    // chromosome of the current reference hash table
 
     unsigned char hashSize;        // size of hash
 
@@ -70,16 +70,70 @@ void SR_InHashTableFree(SR_InHashTable* pHashTable);
 
 
 //===============================
-// Non-constant methods
+// Interface functions
 //===============================
 
+//================================================================
+// function:
+//      read the start part of the hash table file, including the
+//      reference header position and the hash size
+//
+// args:
+//      1. pHashSize: a pointer to the hash size
+//      2. htInput: a file pointer to the hash table input file
+// 
+// return:
+//      the reference header position (secrete code for 
+//      compatibility check with the reference file)
+//================================================================ 
 int64_t SR_InHashTableReadStart(unsigned char* pHashSize, FILE* htInput);
 
-SR_Bool SR_InHashTableJump(FILE* htInput, const SR_RefHeader* pRefHeader, int32_t refID);
+//==================================================================
+// function:
+//      jump to a certain chromosome in the hash table file given
+//      the reference ID
+//
+// args:
+//      1. htInput: a file pointer to the hash table input file
+//      2. pRefHeader: a pointer to the reference header structure
+//      3. refID: the reference ID
+// 
+// return:
+//      SR_OK: jump successfully
+//      SR_ERR: found an error during jump
+//==================================================================
+SR_Status SR_InHashTableJump(FILE* htInput, const SR_RefHeader* pRefHeader, int32_t refID);
 
-SR_Bool SR_InHashTableRead(SR_InHashTable* pHashTable, FILE* htInput);
+//==================================================================
+// function:
+//      read the hash positions of a chromosome into the hash table
+//      structure
+//
+// args:
+//      1. pHashTable: a pointer to the hash table structure
+//      2. htInput: a file pointer to the hash table input file
+// 
+// return:
+//      SR_OK: read successfully
+//      SR_ERR: found an error during reading
+//==================================================================
+SR_Status SR_InHashTableRead(SR_InHashTable* pHashTable, FILE* htInput);
 
-SR_Bool SR_InHashTableSearch(HashPosView* hashPosView, const SR_InHashTable* pHashTable, uint32_t hashKey);
+//======================================================================
+// function:
+//      get the hash position array of a given hash key
+//
+// args:
+//      1. pHashPosView: a pointer to the hash position view structure
+//      2. pHashTable: a pointer to the hash table structure
+//      3. hashKey: hash key
+// 
+// return:
+//      if the hash key is found in the hash table, hash position
+//      structure will be loaded and TRUE will be returned; otherwise
+//      FALSE is returned.
+//======================================================================
+SR_Bool SR_InHashTableSearch(HashPosView* pHashPosView, const SR_InHashTable* pHashTable, uint32_t hashKey);
 
 
 #endif  /*SR_INHASHTABLE_H*/

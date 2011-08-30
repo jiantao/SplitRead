@@ -10,7 +10,7 @@
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  YOUR NAME (), 
+ *         Author:  Jianao Wu (), 
  *        Company:  
  *
  * =====================================================================================
@@ -69,17 +69,17 @@ int64_t SR_InHashTableReadStart(unsigned char* pHashSize, FILE* htInput)
     return refHeaderPos;
 }
 
-SR_Bool SR_InHashTableJump(FILE* htInput, const SR_RefHeader* pRefHeader, int32_t refID)
+SR_Status SR_InHashTableJump(FILE* htInput, const SR_RefHeader* pRefHeader, int32_t refID)
 {
     int64_t jumpPos = pRefHeader->htFilePos[refID];
 
     if (fseeko(htInput, jumpPos, SEEK_SET) != 0)
-        return FALSE;
+        return SR_ERR;
 
-    return TRUE;
+    return SR_OK;
 }
 
-SR_Bool SR_InHashTableRead(SR_InHashTable* pHashTable, FILE* htInput)
+SR_Status SR_InHashTableRead(SR_InHashTable* pHashTable, FILE* htInput)
 {
     size_t readSize = 0;
 
@@ -87,9 +87,9 @@ SR_Bool SR_InHashTableRead(SR_InHashTable* pHashTable, FILE* htInput)
     if (readSize != 1)
     {
         if (feof(htInput))
-            return FALSE;
+            return SR_EOF;
         else
-            SR_ErrSys("ERROR: Cannot read the chromsome number from the hash table file.\n");
+            return SR_ERR;
     }
 
     readSize = fread(pHashTable->indices, sizeof(uint32_t), pHashTable->numHashes, htInput);
@@ -109,11 +109,11 @@ SR_Bool SR_InHashTableRead(SR_InHashTable* pHashTable, FILE* htInput)
     if (readSize != pHashTable->numPos)
         SR_ErrSys("ERROR: Cannot read the hash positions from the hash table.\n");
 
-    return TRUE;
+    return SR_OK;
 }
 
 
-SR_Bool SR_InHashTableSearch(HashPosView* hashPosView, const SR_InHashTable* pHashTable, uint32_t hashKey)
+SR_Bool SR_InHashTableSearch(HashPosView* pHashPosView, const SR_InHashTable* pHashTable, uint32_t hashKey)
 {
     if(hashKey >= pHashTable->numHashes)
         SR_ErrSys("ERROR: Invalid hash key.\n");
@@ -124,8 +124,8 @@ SR_Bool SR_InHashTableSearch(HashPosView* hashPosView, const SR_InHashTable* pHa
     if (index == nextIndex)
         return FALSE;
     
-    hashPosView->size = nextIndex - index;
-    hashPosView->data = pHashTable->hashPos + index;
+    pHashPosView->size = nextIndex - index;
+    pHashPosView->data = pHashTable->hashPos + index;
 
     return TRUE;
 }

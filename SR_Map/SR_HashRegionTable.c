@@ -22,10 +22,11 @@
 #include <string.h>
 
 #include "SR_Error.h"
-#include "SR_Types.h"
 #include "SR_Utilities.h"
 #include "SR_HashRegionTable.h"
 
+// default capacity of a hash region array
+#define DEFAULT_HASH_ARR_CAPACITY 50
 
 //=========================
 // Static methods
