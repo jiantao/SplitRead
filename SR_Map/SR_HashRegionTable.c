@@ -40,6 +40,15 @@ static void ResetBestRegions(HashRegionTable* pRegionTable, unsigned short query
     {
         SR_ARRAY_ALLOC(pRegionTable->pBestCloseRegions, queryLen, BestRegionArray, BestRegion);
         SR_ARRAY_ALLOC(pRegionTable->pBestFarRegions, queryLen, BestRegionArray, BestRegion);
+
+        for (unsigned int i = 0; i != queryLen; ++i)
+        {
+            BestRegion* tempRegion = pRegionTable->pBestCloseRegions->data + i;
+            tempRegion->queryBegin = i;
+
+            tempRegion = pRegionTable->pBestFarRegions->data + i;
+            tempRegion->queryBegin = i;
+        }
     }
 
     SR_Bool isSmall = FALSE;
@@ -52,14 +61,20 @@ static void ResetBestRegions(HashRegionTable* pRegionTable, unsigned short query
 
     if ((pRegionTable->pBestCloseRegions)->data == NULL)
     {
-        unsigned short capacity = isSmall ? 2 * queryLen : queryLen;
+        unsigned int capacity = isSmall ? 2 * queryLen : queryLen;
 
         SR_ARRAY_INIT(pRegionTable->pBestCloseRegions, capacity, BestRegion);
         SR_ARRAY_INIT(pRegionTable->pBestFarRegions, capacity, BestRegion);
-    }
 
-    memset((pRegionTable->pBestCloseRegions)->data, 0, queryLen * sizeof(BestRegion));
-    memset((pRegionTable->pBestFarRegions)->data, 0, queryLen * sizeof(BestRegion));
+        for (unsigned int i = 0; i != capacity; ++i)
+        {
+            BestRegion* tempRegion = pRegionTable->pBestCloseRegions->data + i;
+            tempRegion->queryBegin = i;
+
+            tempRegion = pRegionTable->pBestFarRegions->data + i;
+            tempRegion->queryBegin = i;
+        }
+    }
 
     (pRegionTable->pBestCloseRegions)->size = queryLen;
     (pRegionTable->pBestFarRegions)->size = queryLen;

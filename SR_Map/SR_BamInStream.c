@@ -33,7 +33,7 @@
 #define NO_QUERY_YET (-2)
 
 // default capacity of a bam array
-#define DEFAULT_BAM_ARRAY_CAP 50
+#define DEFAULT_BAM_ARRAY_CAP 200
 
 // default soft clipping tolerance
 #define DEFAULT_SC_TOLERANCE 0.2
@@ -138,10 +138,26 @@ static void SR_BamArrayStartOver(SR_BamArray* pBamArray)
 
 static int SR_BamInStreamLoadNext(SR_BamInStream* pBamInStream)
 {
+    // for the bam alignment array, if we need to expand its space
+    // we have to initialize those newly created bam alignment 
+    // and update the query name hash since the address of those
+    // bam alignments are changed after expanding
     if (pBamInStream->pBamArrayCurr->size == pBamInStream->pBamArrayCurr->capacity)
     {
         pBamInStream->pBamArrayCurr->capacity *= 2;
         pBamInStream->pBamArrayCurr->data = (bam1_t*) realloc(pBamInStream->pBamArrayCurr->data, sizeof(bam1_t) * pBamInStream->pBamArrayCurr->capacity);
+        if (pBamInStream->pBamArrayCurr->data == NULL)
+            SR_ErrQuit("ERROR: Not enough memory for the bam alignment array in the bam in stream object.\n");
+
+        memset(SR_ARRAY_GET_PT(pBamInStream->pBamArrayCurr, pBamInStream->pBamArrayCurr->size), 0, sizeof(bam1_t) * SR_ARRAY_GET_SIZE(pBamInStream->pBamArrayCurr));
+        kh_clear(queryName, pBamInStream->nameHashCurr);
+        
+        int khRet = 0;
+        for (unsigned int i = 0; i != SR_ARRAY_GET_SIZE(pBamInStream->pBamArrayCurr); ++i)
+        {
+            khiter_t khIter = kh_put(queryName, pBamInStream->nameHashCurr, bam1_qname(SR_ARRAY_GET_PT(pBamInStream->pBamArrayCurr, i)), &khRet);
+            kh_value(pBamInStream->nameHashCurr, khIter) = SR_ARRAY_GET_PT(pBamInStream->pBamArrayCurr, i);
+        }
     }
 
     ++(pBamInStream->pBamArrayCurr->size);
@@ -306,8 +322,8 @@ SR_Status SR_BamInStreamJump(SR_BamInStream* pBamInStream, int32_t refID)
     int ret;
     bam_iter_t pBamIter = bam_iter_query(pBamInStream->pBamIndex, refID, 0, INT_MAX);
 
-    ++(pBamInStream->pBamArrayCurr->size);
     ret = bam_iter_read(pBamInStream->fpBamInput, pBamIter, SR_ARRAY_GET_FIRST_PT(pBamInStream->pBamArrayCurr));
+    ++(pBamInStream->pBamArrayCurr->size);
 
     bam_iter_destroy(pBamIter);
 
