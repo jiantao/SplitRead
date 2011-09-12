@@ -20,6 +20,7 @@
 #define  SR_BAMINSTREAM_H
 
 #include <stdlib.h>
+#include <gsl/gsl_histogram.h>
 
 #include "bam.h"
 #include "SR_Types.h"
@@ -32,6 +33,7 @@
 // structure holding related bam input variables
 typedef struct SR_BamInStreamPrvt SR_BamInStream;
 
+
 // stucture holding header information
 typedef struct SR_BamHeader
 {
@@ -41,17 +43,37 @@ typedef struct SR_BamHeader
 
 }SR_BamHeader;
 
+typedef struct SR_FragLenDstrb
+{
+    char** pReadGrpNames;
+
+    void* pReadGrpHash;
+
+    gsl_histogram** pFragLenHists;
+
+    uint8_t drctField;
+
+    uint32_t size;
+
+    uint32_t capacity;
+
+}SR_FragLenDstrb;
+
 //===============================
 // Constructors and Destructors
 //===============================
 
-SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, double scTolerance);
+SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, unsigned int numThreads, unsigned int buffCapacity, unsigned int reportSize, double scTolerance);
 
 void SR_BamInStreamFree(SR_BamInStream* pBamInStream);
 
 SR_BamHeader* SR_BamHeaderAlloc(void);
 
 void SR_BamHeaderFree(SR_BamHeader* pBamHeader);
+
+SR_FragLenDstrb* SR_FragLenDstrbAlloc(uint8_t drctField, uint32_t capacity);
+
+void SR_FragLenDstrbFree(SR_FragLenDstrb* pDstrb);
 
 
 //======================
@@ -103,6 +125,15 @@ inline const uint32_t* SR_BamHeaderGetRefLens(const SR_BamHeader* pBamHeader)
     return pBamHeader->pOrigHeader->target_len;
 }
 
+static inline uint8_t SR_SetDrctMode(const int* drctModes)
+{
+    uint8_t drctField = 0;
+    for (unsigned int i = 0; drctModes[i] != 0; ++i)
+        (drctField) |= (1 << drctModes[i]);
+
+    return drctField;
+}
+
 
 //======================
 // Interface functions
@@ -139,6 +170,10 @@ SR_Status SR_BamInStreamJump(SR_BamInStream* pBamInStream, int32_t refID);
 //      indicator will be set at the start of the first alignment
 //================================================================ 
 SR_BamHeader* SR_BamInStreamLoadHeader(SR_BamInStream* pBamInStream);
+
+SR_Status SR_FragLenDstrbSetRG(SR_FragLenDstrb* pDstrb, const SR_BamHeader* pBamHeader);
+
+void SR_FragLenDstrbSetHist(SR_FragLenDstrb* pDstrb, size_t numBins);
 
 //================================================================
 // function:
@@ -185,7 +220,7 @@ int32_t SR_BamInStreamGetRefID(const SR_BamInStream* pBamInStream);
 //      the end of file, return SR_EOF; if we finish the current
 //      chromosome, return SR_OUT_OF_RANGE; else, return SR_ERR
 //================================================================
-SR_Status SR_BamInStreamGetPair(bam1_t** ppAnchor, bam1_t** ppOrphan, SR_BamInStream* pBamInStream);
+SR_Status SR_BamInStreamGetPairs(SR_BamInStream* pBamInStream, unsigned int threadID, SR_FragLenDstrb* pDstrb);
 
 
 #endif  /*SR_BAMINSTREAM_H*/
