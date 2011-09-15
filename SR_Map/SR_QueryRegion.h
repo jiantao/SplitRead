@@ -21,6 +21,7 @@
 
 #include "bam.h"
 #include "SR_Types.h"
+#include "SR_BamMemPool.h"
 
 //===============================
 // Type and constant definition
@@ -120,6 +121,17 @@ static inline void SR_SetStrand(bam1_t* pAlignment, SR_Strand strand)
 // Interface functions
 //======================
 
+//================================================================
+// function:
+//      load the unique-orphan pair into the query region 
+//      object
+//
+// args:
+//      1. pQueryRegion: a pointer to a query region object
+//      2. iter: a iterator to an alignment buffer
+//================================================================ 
+SR_Status SR_QueryRegionLoadPair(SR_QueryRegion* pQuerRegion, SR_BamListIter* pIter);
+
 //==============================================================
 // function:
 //      transfer the DNA sequence in bam structure from the
@@ -143,7 +155,7 @@ void SR_QueryRegionLoadSeq(SR_QueryRegion* pQueryRegion);
 //      the strand of the orphan mate will not be set.
 //      you have to set it through the "SR_SetStrand"
 //==============================================================
-void SR_QueryRegionSetSeq(SR_QueryRegion* pQueryRegion, SR_SeqAction action);
+void SR_QueryRegionChangeSeq(SR_QueryRegion* pQueryRegion, SR_SeqAction action);
 
 
 //==============================================================

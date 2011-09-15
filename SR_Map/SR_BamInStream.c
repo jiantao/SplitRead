@@ -21,7 +21,6 @@
 #include "khash.h"
 #include "SR_Error.h"
 #include "SR_Utilities.h"
-#include "SR_QueryRegion.h"
 #include "SR_BamInStream.h"
 
 
@@ -56,73 +55,16 @@ enum AlignmentStatus
 // it includes proper paired reads, secondar reads, qc-failed reads and duplicated reads
 #define SR_BAM_FMASK (BAM_FPROPER_PAIR | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP)
 
+// bin number of buffers
 #define PREV_BIN 0
-
 #define CURR_BIN 1
-
-typedef struct SR_BamNode SR_BamNode;
-
-typedef struct SR_BamList SR_BamList;
-
-typedef struct SR_BamBuff SR_BamBuff;
-
-typedef struct SR_BamMemPool SR_BamMemPool;
-
-struct SR_BamNode
-{
-    bam1_t alignment;
-
-    SR_BamNode* prev;
-
-    SR_BamNode* next;
-
-    SR_BamBuff* whereFrom;
-};
-
-struct SR_BamList
-{
-    unsigned int numNode;
-
-    SR_BamNode* first;
-
-    SR_BamNode* last;
-};
-
-struct SR_BamBuff
-{
-    unsigned int numUsed;
-
-    SR_BamBuff* nextBuff;
-
-    SR_BamNode* pNodeArray;
-};
-
-struct SR_BamMemPool
-{
-    unsigned short numBuffs;
-
-    unsigned int buffCapacity;
-
-    SR_BamBuff* pFirstBuff;
-
-    SR_BamNode* pFirstAvlNode;
-};
-
-// array of bam alignments
-typedef struct SR_BamArray
-{
-    bam1_t* data;            // a pointer to the read-in bam alignments
-
-    unsigned int size;       // how many alignments are in the array
-
-    unsigned int capacity;   // maximum number of alignments the array can hold
-
-}SR_BamArray;
 
 // initialize a string-to-bam hash table used to retrieve a pair of read
 KHASH_MAP_INIT_STR(queryName, SR_BamNode*);
 
 KHASH_MAP_INIT_STR(readGrpName, uint32_t);
+
+KHASH_SET_INIT_INT64(buffAddress);
 
 // private data structure that holds all bam-input-related information
 struct SR_BamInStreamPrvt
@@ -133,11 +75,11 @@ struct SR_BamInStreamPrvt
 
     SR_BamMemPool* pMemPool;                   // memory pool used to allocate and recycle the bam alignments
 
-    khash_t(queryName)* pNameHashes[2];     
+    khash_t(queryName)* pNameHashes[2];        // two hashes used to get a pair of alignments
 
-    SR_BamList* pRetLists;
+    SR_BamList* pRetLists;                     // when we find any unique-orphan pairs we push them into these lists
 
-    SR_BamNode* pNewNode;
+    SR_BamNode* pNewNode;                      // the just read-in bam alignment
 
     SR_BamList pAlgnLists[2];                  // lists used to store those incoming alignments. each thread has their own lists.
 
@@ -152,6 +94,8 @@ struct SR_BamInStreamPrvt
     uint32_t binLen;                           // the length of bin
 
     double scTolerance;                        // soft clipping tolerance rate. 
+
+    uint8_t drctField;
 };
 
 
@@ -203,153 +147,6 @@ static void SR_BamArrayStartOver(SR_BamArray* pBamArray)
 }
 
 */
-
-static SR_BamBuff* SR_BamBuffAlloc(unsigned int buffCapacity)
-{
-    SR_BamBuff* pNewBuff = (SR_BamBuff*) malloc(sizeof(SR_BamBuff));
-    if (pNewBuff == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the bam memory node object.\n");
-
-    pNewBuff->numUsed = 0;
-    pNewBuff->nextBuff = NULL;
-
-    pNewBuff->pNodeArray = (SR_BamNode*) calloc(buffCapacity, sizeof(SR_BamNode));
-    if (pNewBuff->pNodeArray == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the storage of alignments in the bam memory node object.\n");
-
-    for (unsigned int i = 0; i != buffCapacity - 1; ++i)
-    {
-        pNewBuff->pNodeArray[i].whereFrom = pNewBuff;
-        pNewBuff->pNodeArray[i].next = &(pNewBuff->pNodeArray[i + 1]);
-    }
-
-    pNewBuff->pNodeArray[buffCapacity - 1].whereFrom = pNewBuff;
-
-    return pNewBuff;
-}
-
-static void SR_BamBuffFree(SR_BamBuff* pBuff)
-{
-    if (pBuff != NULL)
-    {
-        free(pBuff->pNodeArray);
-        free(pBuff);
-    }
-}
-
-static void SR_BamMemPoolExpand(SR_BamMemPool* pMemPool)
-{
-    SR_BamBuff* pNewBuff = SR_BamBuffAlloc(pMemPool->buffCapacity);
-
-    pNewBuff->nextBuff = pMemPool->pFirstBuff;
-    pMemPool->pFirstBuff = pNewBuff;
-
-    pNewBuff->pNodeArray[pMemPool->buffCapacity - 1].next = pMemPool->pFirstAvlNode;
-    pMemPool->pFirstAvlNode = &(pNewBuff->pNodeArray[0]);
-
-    ++(pMemPool->numBuffs);
-}
-
-static SR_BamMemPool* SR_BamMemPoolAlloc(unsigned int buffCapacity)
-{
-    SR_BamMemPool* pNewPool = (SR_BamMemPool*) malloc(sizeof(SR_BamMemPool));
-    if (pNewPool == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the bam memory pool object.\n");
-
-    pNewPool->numBuffs = 0;
-    pNewPool->pFirstAvlNode = NULL;
-    pNewPool->pFirstBuff = NULL;
-    pNewPool->buffCapacity = buffCapacity;
-
-    SR_BamMemPoolExpand(pNewPool);
-
-    return pNewPool;
-}
-
-static void SR_BamMemPoolFree(SR_BamMemPool* pMemPool)
-{
-    if (pMemPool != NULL)
-    {
-        SR_BamBuff* pDelBuff = pMemPool->pFirstBuff;
-        SR_BamBuff* pNextBuff = pMemPool->pFirstBuff;
-        while (pDelBuff != NULL)
-        {
-            pNextBuff = pDelBuff->nextBuff;
-            SR_BamBuffFree(pDelBuff);
-            pDelBuff = pNextBuff;
-        }
-
-        free(pMemPool);
-    }
-}
-
-static void SR_BamListPushHead(SR_BamList* pList, SR_BamNode* pNewFirstNode)
-{
-    pNewFirstNode->next = pList->first;
-    pNewFirstNode->prev = NULL;
-
-    if (pList->first != NULL)
-        pList->first->prev = pNewFirstNode;
-    else
-        pList->last = pNewFirstNode;
-
-    pList->first = pNewFirstNode;
-    ++(pList->numNode);
-}
-
-static void SR_BamListRemove(SR_BamList* pList, SR_BamNode* pNode)
-{
-    if (pNode->next != NULL)
-        pNode->next->prev = pNode->prev;
-    else
-        pList->last = pNode->prev;
-
-    if (pNode->prev != NULL)
-        pNode->prev->next = pNode->next;
-    else
-        pList->first = pNode->next;
-
-    pNode->next = NULL;
-    pNode->prev = NULL;
-
-    --(pList->numNode);
-}
-
-static void SR_BamListReset(SR_BamList* pList, SR_BamMemPool* pMemPool)
-{
-    if (pList->numNode == 0)
-        return;
-
-    pList->last->next = pMemPool->pFirstAvlNode;
-    pMemPool->pFirstAvlNode = pList->first;
-
-    pList->first = NULL;
-    pList->last = NULL;
-    pList->numNode = 0;
-}
-
-static SR_BamNode* SR_BamNodeAlloc(SR_BamMemPool* pMemPool)
-{
-    if (pMemPool->pFirstAvlNode == NULL)
-    {
-        SR_BamMemPoolExpand(pMemPool);
-    }
-
-    SR_BamNode* pNewNode = pMemPool->pFirstAvlNode;
-    pMemPool->pFirstAvlNode = pMemPool->pFirstAvlNode->next;
-
-    pNewNode->prev = NULL;
-    pNewNode->next = NULL;
-
-    return pNewNode;
-}
-
-static void SR_BamNodeFree(SR_BamNode* pNode, SR_BamMemPool* pMemPool)
-{
-    pNode->prev = NULL;
-    pNode->next = pMemPool->pFirstAvlNode;
-    pMemPool->pFirstAvlNode = pNode;
-}
 
 static inline int SR_BamInStreamLoadNext(SR_BamInStream* pBamInStream)
 {
@@ -437,7 +234,7 @@ static void SR_BamInStreamReset(SR_BamInStream* pBamInStream)
 // Constructors and Destructors
 //===============================
 
-SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, unsigned int numThreads, unsigned int buffCapacity, unsigned int reportSize, double scTolerance)
+SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, unsigned int numThreads, unsigned int buffCapacity, unsigned int reportSize, double scTolerance, uint8_t drctField)
 {
     SR_BamInStream* pBamInStream = (SR_BamInStream*) calloc(1, sizeof(struct SR_BamInStreamPrvt));
     if (pBamInStream == NULL)
@@ -457,6 +254,7 @@ SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, un
     pBamInStream->currBinPos = NO_QUERY_YET;
     pBamInStream->binLen = binLen;
     pBamInStream->scTolerance = scTolerance;
+    pBamInStream->drctField = drctField;
     pBamInStream->pNewNode = NULL;
 
     pBamInStream->pRetLists = (SR_BamList*) calloc(numThreads, sizeof(SR_BamList));
@@ -746,8 +544,9 @@ int32_t SR_BamInStreamGetRefID(const SR_BamInStream* pBamInStream)
     return (pBamInStream->currRefID);
 }
 
+
 // load a unique-orphan pair from a bam file
-SR_Status SR_BamInStreamGetPairs(SR_BamInStream* pBamInStream, unsigned int threadID, SR_FragLenDstrb* pDstrb)
+SR_Status SR_BamInStreamLoadPairs(SR_BamInStream* pBamInStream, unsigned int threadID, SR_FragLenDstrb* pDstrb)
 {
     SR_BamList* pLoadingList = pBamInStream->pRetLists + threadID;
 
@@ -769,6 +568,11 @@ SR_Status SR_BamInStreamGetPairs(SR_BamInStream* pBamInStream, unsigned int thre
         if (pBamInStream->pNewNode->alignment.core.tid != pBamInStream->currRefID
             || pBamInStream->pNewNode->alignment.core.pos >= pBamInStream->currBinPos + 2 * pBamInStream->binLen)
         {
+            if (pBamInStream->pNewNode->alignment.core.tid != pBamInStream->currRefID)
+            {
+                ret = SR_OUT_OF_RANGE;
+            }
+
             pBamInStream->currRefID  = pBamInStream->pNewNode->alignment.core.tid;
             pBamInStream->currBinPos = pBamInStream->pNewNode->alignment.core.pos;
 
@@ -778,10 +582,6 @@ SR_Status SR_BamInStreamGetPairs(SR_BamInStream* pBamInStream, unsigned int thre
             SR_BamListReset(&(pBamInStream->pAlgnLists[PREV_BIN]), pBamInStream->pMemPool);
             SR_BamListReset(&(pBamInStream->pAlgnLists[CURR_BIN]), pBamInStream->pMemPool);
 
-            if (pBamInStream->pNewNode->alignment.core.tid != pBamInStream->currRefID)
-            {
-                ret = SR_OUT_OF_RANGE;
-            }
         }
         else if (pBamInStream->pNewNode->alignment.core.pos >= pBamInStream->currBinPos + pBamInStream->binLen)
         {
@@ -792,11 +592,12 @@ SR_Status SR_BamInStreamGetPairs(SR_BamInStream* pBamInStream, unsigned int thre
 
             SR_BamListReset(&(pBamInStream->pAlgnLists[PREV_BIN]), pBamInStream->pMemPool);
 
-            SR_SWAP(pBamInStream->pAlgnLists[PREV_BIN], pBamInStream->pAlgnLists[PREV_BIN], SR_BamList);
+            SR_SWAP(pBamInStream->pAlgnLists[PREV_BIN], pBamInStream->pAlgnLists[CURR_BIN], SR_BamList);
         }
 
         SR_BamListPushHead(&(pBamInStream->pAlgnLists[CURR_BIN]), pBamInStream->pNewNode);
 
+        SR_Bool foundPair = FALSE;
         SR_BamNode* pAnchor = NULL;
         SR_BamNode* pOrphan = NULL;
 
@@ -805,6 +606,7 @@ SR_Status SR_BamInStreamGetPairs(SR_BamInStream* pBamInStream, unsigned int thre
 
         if (khIter != kh_end(pBamInStream->pNameHashes[PREV_BIN]))
         {
+            foundPair = TRUE;
             pAnchor = kh_value(pBamInStream->pNameHashes[PREV_BIN], khIter);
             pOrphan = pBamInStream->pNewNode;
 
@@ -812,20 +614,6 @@ SR_Status SR_BamInStreamGetPairs(SR_BamInStream* pBamInStream, unsigned int thre
 
             SR_BamListRemove(&(pBamInStream->pAlgnLists[PREV_BIN]), pAnchor);
             SR_BamListRemove(&(pBamInStream->pAlgnLists[CURR_BIN]), pOrphan);
-
-            if (SR_IsQualifiedPair(&pAnchor, &pOrphan, pBamInStream->scTolerance))
-            {
-                SR_BamListPushHead(pLoadingList, pOrphan);
-                SR_BamListPushHead(pLoadingList, pAnchor);
-
-                if (pLoadingList->numNode == pBamInStream->reportSize * 2)
-                    ret = SR_OK;
-            }
-            else
-            {
-                SR_BamNodeFree(pAnchor, pBamInStream->pMemPool);
-                SR_BamNodeFree(pOrphan, pBamInStream->pMemPool);
-            }
         }
         else
         {
@@ -834,6 +622,7 @@ SR_Status SR_BamInStreamGetPairs(SR_BamInStream* pBamInStream, unsigned int thre
 
             if (khRet == 0) // we found a pair of alignments 
             {
+                foundPair = TRUE;
                 pAnchor = kh_value(pBamInStream->pNameHashes[CURR_BIN], khIter);
                 pOrphan = pBamInStream->pNewNode;
 
@@ -841,24 +630,27 @@ SR_Status SR_BamInStreamGetPairs(SR_BamInStream* pBamInStream, unsigned int thre
 
                 SR_BamListRemove(&(pBamInStream->pAlgnLists[CURR_BIN]), pAnchor);
                 SR_BamListRemove(&(pBamInStream->pAlgnLists[CURR_BIN]), pOrphan);
-
-                if (SR_IsQualifiedPair(&pAnchor, &pOrphan, pBamInStream->scTolerance))
-                {
-                    SR_BamListPushHead(pLoadingList, pOrphan);
-                    SR_BamListPushHead(pLoadingList, pAnchor);
-
-                    if (pLoadingList->numNode == pBamInStream->reportSize * 2)
-                        ret = SR_OK;
-                }
-                else
-                {
-                    SR_BamNodeFree(pAnchor, pBamInStream->pMemPool);
-                    SR_BamNodeFree(pOrphan, pBamInStream->pMemPool);
-                }
             }
             else // not finding corresponding mate, save the current value and move on
             {
                 kh_value(pBamInStream->pNameHashes[CURR_BIN], khIter) = pBamInStream->pNewNode;
+            }
+        }
+
+        if (foundPair)
+        {
+            if (SR_IsQualifiedPair(&pAnchor, &pOrphan, pBamInStream->scTolerance))
+            {
+                SR_BamListPushBack(pLoadingList, pAnchor);
+                SR_BamListPushBack(pLoadingList, pOrphan);
+
+                if (ret > 0 && pLoadingList->numNode == pBamInStream->reportSize * 2)
+                    ret = SR_OK;
+            }
+            else
+            {
+                SR_BamNodeFree(pAnchor, pBamInStream->pMemPool);
+                SR_BamNodeFree(pOrphan, pBamInStream->pMemPool);
             }
         }
     }
@@ -870,4 +662,87 @@ SR_Status SR_BamInStreamGetPairs(SR_BamInStream* pBamInStream, unsigned int thre
     }
 
     return ret;
+}
+
+SR_BamListIter SR_BamInStreamGetIter(SR_BamInStream* pBamInStream, unsigned int threadID)
+{
+    return pBamInStream->pRetLists[threadID].first;
+}
+
+void SR_BamInStreamClearBuff(SR_BamInStream* pBamInStream, unsigned int threadID)
+{
+    SR_BamListReset(pBamInStream->pRetLists + threadID, pBamInStream->pMemPool);
+}
+
+unsigned int SR_BamInStreamGetPoolSize(SR_BamInStream* pBamInStream)
+{
+    return (pBamInStream->pMemPool->numBuffs);
+}
+
+unsigned int SR_BamInStreamShrinkPool(SR_BamInStream* pBamInStream, unsigned int newSize)
+{
+    unsigned int currSize = pBamInStream->pMemPool->numBuffs;
+    if (currSize > newSize)
+    {
+        khash_t(buffAddress)* buffHash = kh_init(buffAddress);
+        kh_resize(buffAddress, buffHash, currSize);
+
+        int ret = 0;
+        khiter_t khIter = 0;
+        int64_t address = 0;
+
+        for (SR_BamNode* pUsedNode = pBamInStream->pAlgnLists[PREV_BIN].first; pUsedNode != NULL; pUsedNode = pUsedNode->next)
+        {
+            address = (int64_t) pUsedNode->whereFrom;
+            kh_put(buffAddress, buffHash, address, &ret);
+        }
+
+        for (SR_BamNode* pUsedNode = pBamInStream->pAlgnLists[CURR_BIN].first; pUsedNode != NULL; pUsedNode = pUsedNode->next)
+        {
+            address = (int64_t) pUsedNode->whereFrom;
+            kh_put(buffAddress, buffHash, address, &ret);
+        }
+
+        unsigned int delNum = currSize - newSize;
+        SR_BamBuff* pPrevBuff = NULL;
+        SR_BamBuff* pCurrBuff = pBamInStream->pMemPool->pFirstBuff;
+
+        while (pCurrBuff != NULL && delNum != 0)
+        {
+            int64_t address = (int64_t) pCurrBuff;
+            khIter = kh_get(buffAddress, buffHash, address);
+
+            if (khIter == kh_end(buffHash))
+            {
+                SR_BamBuff* pDelBuff = pCurrBuff;
+                pCurrBuff = pCurrBuff->nextBuff;
+
+                SR_BamBuffClear(pDelBuff, pBamInStream->pMemPool);
+                SR_BamBuffFree(pDelBuff, pBamInStream->pMemPool->buffCapacity);
+                --delNum;
+                --(pBamInStream->pMemPool->numBuffs);
+
+                if (pPrevBuff != NULL)
+                    pPrevBuff->nextBuff = pCurrBuff;
+                else
+                    pBamInStream->pMemPool->pFirstBuff = pCurrBuff;
+            }
+            else
+            {
+                pPrevBuff = pCurrBuff;
+                pCurrBuff = pCurrBuff->nextBuff;
+            }
+        }
+
+        kh_destroy(buffAddress, buffHash);
+    }
+
+    return pBamInStream->pMemPool->numBuffs;
+}
+
+
+
+SR_BamList* SR_BamInStreamGetBuff(SR_BamInStream* pBamInStream, unsigned int threadID)
+{
+    return pBamInStream->pRetLists + threadID;
 }

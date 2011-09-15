@@ -70,6 +70,15 @@ typedef enum
 
 typedef enum
 {
+    SR_1F = 1,
+    SR_1R = 2,
+    SR_2F = 4,
+    SR_2R = 8
+
+}SR_SingleOrnt;
+
+typedef enum
+{
     SR_1F2F = 1,
     SR_1F2R = 2,
     SR_1R2F = 4,
@@ -79,7 +88,7 @@ typedef enum
     SR_2R1F = 64,
     SR_2R1R = 128
 
-}SR_DrctMode;
+}SR_PairOrnt;
 
 typedef SR_SeqAction SR_Strand;
 
