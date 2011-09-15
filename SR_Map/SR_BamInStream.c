@@ -16,6 +16,7 @@
  * =====================================================================================
  */
 
+#include <stdlib.h>
 #include <assert.h>
 
 #include "khash.h"
@@ -102,51 +103,6 @@ struct SR_BamInStreamPrvt
 //===================
 // Static functions
 //===================
-
-/* 
-
-static SR_BamArray* SR_BamArrayAlloc(unsigned int capacity)
-{
-    SR_BamArray* pBamArray = (SR_BamArray*) malloc(sizeof(SR_BamArray));
-    if (pBamArray == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for a bam array object");
-
-    pBamArray->data = (bam1_t*) calloc(capacity, sizeof(bam1_t));
-    if (pBamArray->data == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the storeage of bam alignments in a bam array object");
-
-    pBamArray->size = 0;
-    pBamArray->capacity = capacity;
-
-    return pBamArray;
-}
-
-static void SR_BamArrayFree(SR_BamArray* pBamArray)
-{
-    if (pBamArray != NULL)
-    {
-        if (pBamArray->data != NULL)
-        {
-            for (unsigned int i = 0; i != pBamArray->capacity; ++i)
-                free(pBamArray->data[i].data);
-
-            free(pBamArray->data);
-        }
-
-        free(pBamArray);
-    }
-}
-
-static void SR_BamArrayStartOver(SR_BamArray* pBamArray)
-{
-    if (SR_ARRAY_GET_SIZE(pBamArray) <= 1)
-        return;
-
-    bam_copy1(SR_ARRAY_GET_PT(pBamArray, 0), SR_ARRAY_GET_LAST_PT(pBamArray));
-    pBamArray->size = 1;
-}
-
-*/
 
 static inline int SR_BamInStreamLoadNext(SR_BamInStream* pBamInStream)
 {
@@ -309,54 +265,6 @@ void SR_BamHeaderFree(SR_BamHeader* pBamHeader)
     }
 }
 
-SR_FragLenDstrb* SR_FragLenDstrbAlloc(uint8_t drctField, uint32_t capacity)
-{
-    SR_FragLenDstrb* pNewDstrb = (SR_FragLenDstrb*) malloc(sizeof(*pNewDstrb));
-    if (pNewDstrb == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the fragment length distribution object.\n");
-
-    if (capacity == 0)
-        capacity = DEFAULT_FRAG_DSTRB_CAP;
-
-    pNewDstrb->pReadGrpNames = (char**) calloc(capacity, sizeof(char*));
-    if (pNewDstrb->pReadGrpNames == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the storage of read group names in the fragment length distribution object.\n");
-
-    pNewDstrb->pReadGrpHash = kh_init(readGrpName);
-    pNewDstrb->pFragLenHists = NULL;
-
-    pNewDstrb->drctField = drctField;
-    pNewDstrb->size = 0;
-    pNewDstrb->capacity = capacity;
-
-    return pNewDstrb;
-}
-
-void SR_FragLenDstrbFree(SR_FragLenDstrb* pDstrb)
-{
-    if (pDstrb != NULL)
-    {
-        if (pDstrb->pFragLenHists != NULL)
-        {
-            for (unsigned int i = 0; i != pDstrb->size; ++i)
-                gsl_histogram_free(pDstrb->pFragLenHists[i]);
-
-            free(pDstrb->pFragLenHists);
-        }
-
-        if (pDstrb->pReadGrpNames != NULL)
-        {
-            for (unsigned int i = 0; i != pDstrb->size; ++i)
-                free(pDstrb->pReadGrpNames[i]);
-
-            free(pDstrb->pReadGrpNames);
-        }
-
-        kh_destroy(readGrpName, pDstrb->pReadGrpHash);
-
-        free(pDstrb);
-    }
-}
 
 //======================
 // Interface functions
@@ -453,76 +361,6 @@ SR_BamHeader* SR_BamInStreamLoadHeader(SR_BamInStream* pBamInStream)
     }
 
     return pBamHeader;
-}
-
-SR_Status SR_FragLenDstrbSetRG(SR_FragLenDstrb* pDstrb, const SR_BamHeader* pBamHeader)
-{
-    for (const char* readGrpPos = pBamHeader->pOrigHeader->text; ; ++readGrpPos)
-    {
-        if ((readGrpPos = strstr(readGrpPos, "@RG")) != NULL 
-            && (readGrpPos = strstr(readGrpPos, "ID:")) != NULL)
-        {
-            const char* readGrpEnd = strpbrk(readGrpPos, " \t\n\0");
-            if (readGrpEnd == NULL)
-                return SR_ERR;
-
-            if (pDstrb->size == pDstrb->capacity)
-            {
-                pDstrb->capacity *= 2;
-                pDstrb->pReadGrpNames = (char**) realloc(pDstrb->pReadGrpNames, pDstrb->capacity * sizeof(char*));
-                if (pDstrb->pReadGrpNames == NULL)
-                    SR_ErrQuit("ERROR: Not enough memory for the storage of read group name in the fragment length distribution object.\n");
-            }
-
-            size_t readGrpLen = readGrpEnd - readGrpPos + 1;
-            pDstrb->pReadGrpNames[pDstrb->size] = (char*) calloc(readGrpLen + 1, sizeof(char));
-            if (pDstrb->pReadGrpNames[pDstrb->size] == NULL)
-                SR_ErrQuit("ERROR: Not enough memory for the storage of read group name in the fragment length distribution object.\n");
-
-            strncpy(pDstrb->pReadGrpNames[pDstrb->size], readGrpPos, readGrpLen);
-            ++(pDstrb->size);
-        }
-        else
-            break;
-    }
-
-    if (pDstrb->size == 0)
-    {
-        SR_FragLenDstrbFree(pDstrb);
-        return SR_NOT_FOUND;
-    }
-    else
-    {
-        int khRet = 0;
-        khiter_t khIter;
-        for (unsigned int i = 0; i != pDstrb->size; ++i)
-        {
-            khIter = kh_put(readGrpName, pDstrb->pReadGrpHash, pDstrb->pReadGrpNames[i], &khRet);
-            if (khRet == 0)
-            {
-                SR_ErrMsg("ERROR: Found a non-unique read group name.\n");
-                return SR_ERR;
-            }
-
-            kh_value((khash_t(readGrpName)*) pDstrb->pReadGrpHash, khIter) = i;
-        }
-    }
-
-    return SR_OK;
-}
-
-void SR_FragLenDstrbSetHist(SR_FragLenDstrb* pDstrb, size_t numBins)
-{
-    pDstrb->pFragLenHists = (gsl_histogram**) malloc(pDstrb->size * sizeof(gsl_histogram*));
-    if (pDstrb->pFragLenHists == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the storageof the histogram in the fragment length distribution object.\n");
-
-    for (unsigned int i = 0; i != pDstrb->size; ++i)
-    {
-        pDstrb->pFragLenHists[i] = gsl_histogram_alloc(numBins);
-        if (pDstrb->pFragLenHists[i] == NULL)
-            SR_ErrQuit("ERROR: Not enough memory for the storageof the histogram in the fragment length distribution object.\n");
-    }
 }
 
 // read an alignment from a bam file
@@ -740,9 +578,3 @@ unsigned int SR_BamInStreamShrinkPool(SR_BamInStream* pBamInStream, unsigned int
     return pBamInStream->pMemPool->numBuffs;
 }
 
-
-
-SR_BamList* SR_BamInStreamGetBuff(SR_BamInStream* pBamInStream, unsigned int threadID)
-{
-    return pBamInStream->pRetLists + threadID;
-}

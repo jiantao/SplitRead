@@ -17,12 +17,12 @@
 #ifndef  SR_BAMINSTREAM_H
 #define  SR_BAMINSTREAM_H
 
-#include <stdlib.h>
-#include <gsl/gsl_histogram.h>
 
 #include "bam.h"
 #include "SR_Types.h"
+#include "SR_BamHeader.h"
 #include "SR_BamMemPool.h"
+#include "SR_FragLenDstrb.h"
 
 
 //===============================
@@ -32,31 +32,6 @@
 // structure holding related bam input variables
 typedef struct SR_BamInStreamPrvt SR_BamInStream;
 
-
-// stucture holding header information
-typedef struct SR_BamHeader
-{
-    bam_header_t* pOrigHeader;
-
-    const char** pMD5s;
-
-}SR_BamHeader;
-
-typedef struct SR_FragLenDstrb
-{
-    char** pReadGrpNames;
-
-    void* pReadGrpHash;
-
-    gsl_histogram** pFragLenHists;
-
-    uint8_t drctField;
-
-    uint32_t size;
-
-    uint32_t capacity;
-
-}SR_FragLenDstrb;
 
 //===============================
 // Constructors and Destructors
@@ -77,82 +52,6 @@ SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename,        // name of i
                                     uint8_t drctField);             // proper pair orientation flags (0 for disabling)
 
 void SR_BamInStreamFree(SR_BamInStream* pBamInStream);
-
-SR_BamHeader* SR_BamHeaderAlloc(void);
-
-void SR_BamHeaderFree(SR_BamHeader* pBamHeader);
-
-SR_FragLenDstrb* SR_FragLenDstrbAlloc(uint8_t drctField, uint32_t capacity);
-
-void SR_FragLenDstrbFree(SR_FragLenDstrb* pDstrb);
-
-
-//======================
-// Inline functions
-//======================
-
-//===============================================================
-// function:
-//      get the number of references stored in the bam header
-//
-// args:
-//      1. pBamHeader: a pointer to the header structure
-// 
-// return:
-//      number of references (chromosomes)
-//=============================================================== 
-inline int32_t SR_BamHeaderGetRefNum(const SR_BamHeader* pBamHeader)
-{
-    return (pBamHeader->pOrigHeader->n_targets);
-}
-
-//===============================================================
-// function:
-//      get the reference ID to reference name dictionary
-//
-// args:
-//      1. pBamHeader: a pointer to the header structure
-// 
-// return:
-//      the dictionary of reference ID to reference name
-//=============================================================== 
-inline const char** SR_BamHeaderGetRefNames(const SR_BamHeader* pBamHeader)
-{
-    return (const char**) pBamHeader->pOrigHeader->target_name;
-}
-
-//===============================================================
-// function:
-//      get the array of reference length
-//
-// args:
-//      1. pBamHeader: a pointer to the header structure
-// 
-// return:
-//      an array contains the length of each chromosome
-//=============================================================== 
-inline const uint32_t* SR_BamHeaderGetRefLens(const SR_BamHeader* pBamHeader)
-{
-    return pBamHeader->pOrigHeader->target_len;
-}
-
-inline SR_SingleOrnt SR_BamGetOrnt(bam1_t* pAlgn)
-{
-    if ((pAlgn->core.flag & BAM_FREAD1) != 0)
-    {
-        if ((pAlgn->core.flag & BAM_FREVERSE) == 0)
-            return SR_1F;
-        else
-            return SR_1R;
-    }
-    else
-    {
-        if ((pAlgn->core.flag & BAM_FREVERSE) == 0)
-            return SR_2F;
-        else
-            return SR_2R;
-    }
-}
 
 
 //======================
@@ -190,10 +89,6 @@ SR_Status SR_BamInStreamJump(SR_BamInStream* pBamInStream, int32_t refID);
 //      indicator will be set at the start of the first alignment
 //================================================================ 
 SR_BamHeader* SR_BamInStreamLoadHeader(SR_BamInStream* pBamInStream);
-
-SR_Status SR_FragLenDstrbSetRG(SR_FragLenDstrb* pDstrb, const SR_BamHeader* pBamHeader);
-
-void SR_FragLenDstrbSetHist(SR_FragLenDstrb* pDstrb, size_t numBins);
 
 //================================================================
 // function:
@@ -257,8 +152,6 @@ SR_Status SR_BamInStreamLoadPairs(SR_BamInStream* pBamInStream, unsigned int thr
 //      iterator to the buffer of a thread
 //================================================================ 
 SR_BamListIter SR_BamInStreamGetIter(SR_BamInStream* pBamInStream, unsigned int threadID);
-
-SR_BamList* SR_BamInStreamGetBuff(SR_BamInStream* pBamInStream, unsigned int threadID);
 
 //================================================================
 // function:
