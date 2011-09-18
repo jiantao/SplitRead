@@ -22,15 +22,39 @@
 #include "SR_Types.h"
 #include "SR_BamHeader.h"
 #include "SR_BamMemPool.h"
-#include "SR_FragLenDstrb.h"
-
 
 //===============================
 // Type and constant definition
 //===============================
 
-// structure holding related bam input variables
-typedef struct SR_BamInStreamPrvt SR_BamInStream;
+// private data structure that holds all bam-input-related information
+typedef struct SR_BamInStream
+{
+    bamFile fpBamInput;                        // file pointer to a input bam file
+
+    bam_index_t* pBamIndex;                    // file pointer to a input bam index file
+
+    SR_BamMemPool* pMemPool;                   // memory pool used to allocate and recycle the bam alignments
+
+    void* pNameHashes[2];                      // two hashes used to get a pair of alignments
+
+    SR_BamList* pRetLists;                     // when we find any unique-orphan pairs we push them into these lists
+
+    SR_BamNode* pNewNode;                      // the just read-in bam alignment
+
+    SR_BamList pAlgnLists[2];                  // lists used to store those incoming alignments. each thread has their own lists.
+
+    unsigned int numThreads;                   // number of threads will be used
+
+    unsigned int reportSize;                   // number of alignments should be loaded before report
+
+    int32_t currRefID;                         // the reference ID of the current read-in alignment
+
+    int32_t currBinPos;                        // the start position of current bin (0-based)
+
+    uint32_t binLen;                           // the length of bin
+
+}SR_BamInStream;
 
 
 //===============================
@@ -45,11 +69,8 @@ SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename,        // name of i
                                      
                                     unsigned int buffCapacity,      // the number of alignments can be stored in each chunk of the memory pool
                                     
-                                    unsigned int reportSize,        // number of unique-orphan pairs should be cached before report
+                                    unsigned int reportSize);       // number of alignments should be cached before report
                                     
-                                    double scTolerance,             // soft clipping tolerance.
-                                    
-                                    uint8_t drctField);             // proper pair orientation flags (0 for disabling)
 
 void SR_BamInStreamFree(SR_BamInStream* pBamInStream);
 
@@ -107,7 +128,17 @@ SR_BamHeader* SR_BamInStreamLoadHeader(SR_BamInStream* pBamInStream);
 //      beginning of an alignment. Upon success, the position 
 //      indicator will be set at the start of the next alignment
 //================================================================ 
-SR_Status SR_BamInStreamRead(bam1_t* pAlignment, SR_BamInStream* pBamInStream);
+inline SR_Status SR_BamInStreamRead(bam1_t* pAlignment, SR_BamInStream* pBamInStream)
+{
+    int ret = bam_read1(pBamInStream->fpBamInput, pAlignment);
+
+    if (ret > 0)
+        return SR_OK;
+    else if (ret == -1)
+        return SR_EOF;
+    else
+        return SR_ERR;
+}
 
 //================================================================
 // function:
@@ -119,18 +150,16 @@ SR_Status SR_BamInStreamRead(bam1_t* pAlignment, SR_BamInStream* pBamInStream);
 // return:
 //      reference ID
 //================================================================ 
-int32_t SR_BamInStreamGetRefID(const SR_BamInStream* pBamInStream);
+#define SR_BamInStreamGetRefID(pBamInStream) ((pBamInStream)->currRefID)
 
 //==================================================================
 // function:
-//      load a certain number of unique-orphan pairs from the 
-//      bam file into the buffer for a give thread
+//      load a pair of bam alignments
 //
 // args:
-//      1. pBamInStream : a pointer to an bam instream structure
-//      2. threadID: the ID of a thread
-//      3. pDstb: a pointer to the fragment length distribution
-//                object
+//      1. ppAlgnOne: a pointer to the pointer of an alignment
+//      2. ppAlgnTwo: a pointer to the pointer of an alignment
+//      3. pBamInStream : a pointer to an bam instream structure
 //
 // return:
 //      if we get enough unique-orphan pair, return SR_OK; 
@@ -138,7 +167,20 @@ int32_t SR_BamInStreamGetRefID(const SR_BamInStream* pBamInStream);
 //      the current chromosome, return SR_OUT_OF_RANGE; 
 //      else, return SR_ERR
 //==================================================================
-SR_Status SR_BamInStreamLoadPairs(SR_BamInStream* pBamInStream, unsigned int threadID, SR_FragLenDstrb* pDstrb);
+SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo, SR_BamInStream* pBamInStream);
+
+//================================================================
+// function:
+//      get the size of the memory pool in the bam in stream
+//      structure
+//
+// args:
+//      1. pBamInStream: a pointer to an bam instream structure
+// 
+// return:
+//      the size of memory pool in the bam in stream object
+//================================================================ 
+#define SR_BamInStreamGetPoolSize(pBamInStream) ((pBamInStream)->pMemPool->numBuffs)
 
 //================================================================
 // function:
@@ -151,30 +193,50 @@ SR_Status SR_BamInStreamLoadPairs(SR_BamInStream* pBamInStream, unsigned int thr
 // return:
 //      iterator to the buffer of a thread
 //================================================================ 
-SR_BamListIter SR_BamInStreamGetIter(SR_BamInStream* pBamInStream, unsigned int threadID);
+#define SR_BamInStreamGetIter(pBamInStream, threadID) SR_BamListGetIter((pBamInStream)->pRetLists + (threadID))
 
 //================================================================
 // function:
-//      clear the alignment buffer that associates with a
-//      certain thread
+//      push the qualified alignment into a given thread buffer
 //
 // args:
 //      1. pBamInStream: a pointer to an bam instream structure
+//      2. pAlignment: a pointer to a qualified alignment
 //      2. threadID: ID of a thread
-//================================================================ 
-void SR_BamInStreamClearBuff(SR_BamInStream* pBamInStream, unsigned int threadID);
-
-//================================================================
-// function:
-//      get the size of the memory pool in a bam in stream object
-//
-// args:
-//      1. pBamInStream: a pointer to an bam instream structure
 // 
 // return:
-//      number of memory buffers in the memory pool
+//      status of the thread buffer. if the thread buffer is full
+//      then return SR_FULL else return SR_OK
 //================================================================ 
-unsigned int SR_BamInStreamGetPoolSize(SR_BamInStream* pBamInStream);
+inline SR_Status SR_BamInStreamPush(SR_BamInStream* pBamInStream, SR_BamNode* pAlignment, unsigned int threadID)
+{
+    SR_BamListPushBack(pBamInStream->pRetLists + threadID, pAlignment);
+
+    if (pBamInStream->pRetLists[threadID].numNode == pBamInStream->reportSize)
+        return SR_FULL;
+
+    return SR_OK;
+}
+
+//================================================================
+// function:
+//      recycle an unwanted bam node
+//
+// args:
+//      1. pBamInStream: a pointer to an bam instream structure
+//      2. pBamNode: a pointer to a bam node 
+//================================================================ 
+#define SR_BamInStreamRecycle(pBamInStream, pBamNode) SR_BamListPushHead(&((pBamInStream)->pMemPool->avlNodeList), (pBamNode))
+
+//================================================================
+// function:
+//      clear the buffer associated with a certain thread
+//
+// args:
+//      1. pBamInStream: a pointer to an bam instream structure
+//      2. threadID: the id of the thread that needs to be clear
+//================================================================ 
+#define SR_BamInStreamClearBuff(pBamInStream, threadID) SR_BamListReset((pBamInStream)->pRetLists + (threadID), (pBamInStream)->pMemPool)
 
 //================================================================
 // function:

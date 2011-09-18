@@ -31,6 +31,7 @@ typedef enum
     SR_OK  =           0,
     SR_EOF =          -1,
     SR_ERR =          -2,
+    SR_FULL      =    -98,
     SR_NOT_FOUND =    -99,
     SR_OUT_OF_RANGE = -100
 

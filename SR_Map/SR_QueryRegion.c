@@ -80,7 +80,7 @@ SR_Status SR_QueryRegionLoadPair(SR_QueryRegion* pQuerRegion, SR_BamListIter* pI
     if ((*pIter) == NULL)
         return SR_OUT_OF_RANGE;
 
-    pQuerRegion->pAnchor = &(((*pIter))->alignment);
+    pQuerRegion->pAnchor = &((*pIter)->alignment);
     (*pIter) = (*pIter)->next;
     if ((*pIter) == NULL)
         return SR_ERR;
