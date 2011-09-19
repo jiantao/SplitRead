@@ -23,11 +23,50 @@
 // default capacity of fragment length distribution
 #define DEFAULT_FRAG_DSTRB_CAP 10
 
-// default fragment length distribution
-#define DEFAULT_FRAG_LEN 10000.0
-
 // read group name hash
 KHASH_MAP_INIT_STR(readGrpName, uint32_t);
+
+
+static void SR_FragLenHistInit(SR_FragLenHist* pHist, uint32_t fragLen)
+{
+    pHist->min = fragLen;
+    pHist->max = fragLen;
+
+    pHist->lowerBound = fragLen / 2;
+    pHist->size = fragLen * 2 - pHist->lowerBound;
+
+    pHist->bin = (uint64_t*) calloc(pHist->size, sizeof(uint64_t));
+    if (pHist->bin == NULL)
+        SR_ErrQuit("ERROR: Not enough memory for the fragment length histogram object.\n");
+}
+
+static void SR_FragLenHistResize(SR_FragLenHist* pHist, uint32_t newBound)
+{
+    if (newBound >= pHist->lowerBound + pHist->size)
+    {
+        uint32_t newSize = newBound - pHist->lowerBound;
+        pHist->bin = (uint64_t*) realloc(pHist->bin, newSize * sizeof(uint64_t));
+        if (pHist->bin == NULL)
+            SR_ErrQuit("ERROR: Not enough memory for the storage of bins in the histogram object.\n");
+
+        memset(pHist->bin + pHist->size, 0, newSize - pHist->size);
+        pHist->size = newSize;
+    }
+    else if (newBound < pHist->lowerBound)
+    {
+        size_t newSize = pHist->lowerBound + pHist->size - newBound;
+        uint64_t* newBin = calloc(newSize, sizeof(uint64_t));
+        if (newBin == NULL)
+            SR_ErrQuit("ERROR: Not enough memory for the storage of bins in the histogram object.\n");
+
+        memcpy(newBin + (newSize - pHist->size), pHist->bin, pHist->size * sizeof(uint64_t));
+        free(pHist->bin);
+        pHist->bin = newBin;
+
+        pHist->lowerBound = newBound;
+        pHist->size = newSize;
+    }
+}
 
 SR_FragLenDstrb* SR_FragLenDstrbAlloc(unsigned short minMQ, uint32_t capacity)
 {
@@ -44,13 +83,12 @@ SR_FragLenDstrb* SR_FragLenDstrbAlloc(unsigned short minMQ, uint32_t capacity)
 
 
     pNewDstrb->pReadGrpHash = NULL;
-    pNewDstrb->pFragLenHists = NULL;
-    pNewDstrb->pFragLenRange = NULL;
+    pNewDstrb->pHists = NULL;
 
     pNewDstrb->size = 0;
     pNewDstrb->capacity = capacity;
 
-    pNewDstrb->minMQ = minMQ
+    pNewDstrb->minMQ = minMQ;
     pNewDstrb->hasRG = TRUE;
 
     return pNewDstrb;
@@ -60,12 +98,13 @@ void SR_FragLenDstrbFree(SR_FragLenDstrb* pDstrb)
 {
     if (pDstrb != NULL)
     {
-        if (pDstrb->pFragLenHists != NULL)
+        free(pDstrb->pHists);
+        if (pDstrb->pHists != NULL)
         {
             for (unsigned int i = 0; i != pDstrb->size; ++i)
-                gsl_histogram_free(pDstrb->pFragLenHists[i]);
+                free(pDstrb->pHists[i].bin);
 
-            free(pDstrb->pFragLenHists);
+            free(pDstrb->pHists);
         }
 
         if (pDstrb->pReadGrpNames != NULL)
@@ -76,7 +115,6 @@ void SR_FragLenDstrbFree(SR_FragLenDstrb* pDstrb)
             free(pDstrb->pReadGrpNames);
         }
 
-        free(pDstrb->pFragLenRange);
         kh_destroy(readGrpName, pDstrb->pReadGrpHash);
 
         free(pDstrb);
@@ -155,29 +193,66 @@ SR_Status SR_FragLenDstrbSetRG(SR_FragLenDstrb* pDstrb, const SR_BamHeader* pBam
         pDstrb->hasRG = FALSE;
     }
 
-    // initialize the fragment length range array according to the number of read groups
-    pDstrb->pFragLenRange = (double (*)[2]) calloc(2 * pDstrb->size, sizeof(double));
-    if (pDstrb->pFragLenRange == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the storage of fragment lenght range array in the fragment lenght distribution object.\n");
+    pDstrb->pHists = (SR_FragLenHist*) calloc(pDstrb->size,  sizeof(SR_FragLenHist));
+    if (pDstrb->pHists == NULL)
+        SR_ErrQuit("ERROR: Not enough memory for the storageof the histogram in the fragment length distribution object.\n");
 
     return SR_OK;
 }
 
-void SR_FragLenDstrbInitHists(SR_FragLenDstrb* pDstrb)
+SR_Status SR_FragLenDstrbUpdate(SR_FragLenDstrb* pDstrb, const SR_BamPairStats* pPairStats)
 {
-    pDstrb->pFragLenHists = (gsl_histogram**) malloc(pDstrb->size * sizeof(gsl_histogram*));
-    if (pDstrb->pFragLenHists == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the storageof the histogram in the fragment length distribution object.\n");
+    unsigned int dstrbIndex = 0;
 
-    for (unsigned int i = 0; i != pDstrb->size; ++i)
+    if (pDstrb->hasRG)
     {
-        double min = pDstrb->pFragLenRange[i][0];
-        double max = pDstrb->pFragLenRange[i][1];
-        pDstrb->pFragLenHists[i] = gsl_histogram_alloc((size_t) max - min);
-        if (pDstrb->pFragLenHists[i] == NULL)
-            SR_ErrQuit("ERROR: Not enough memory for the storageof the histogram in the fragment length distribution object.\n");
+        khash_t(readGrpName)* pRgHash = pDstrb->pReadGrpHash;
+        khiter_t khIter = kh_get(readGrpName, pRgHash, pPairStats->RG);
+        if (khIter != kh_end(pRgHash))
+        {
+            dstrbIndex = kh_value(pRgHash, khIter);
+        }
+        else
+        {
+            SR_ErrMsg("ERROR: Found a read group name that is not record in the header\n");
+            return SR_ERR;
+        }
 
-        gsl_histogram_set_ranges_uniform(pDstrb->pFragLenHists[i], min, max);
+        pDstrb->pReadGrpHash = pRgHash;
     }
-}
 
+    SR_FragLenHist* pCurrHist = pDstrb->pHists + dstrbIndex;
+    if (pCurrHist->bin == NULL)
+    {
+        SR_FragLenHistInit(pCurrHist, pPairStats->fragLen);
+    }
+
+    if (pPairStats->fragLen >= pCurrHist->lowerBound + pCurrHist->size)
+    {
+        SR_FragLenHistResize(pCurrHist, pPairStats->fragLen * 2);
+    }
+    else if (pPairStats->fragLen < pCurrHist->lowerBound)
+    {
+        SR_FragLenHistResize(pCurrHist, pPairStats->fragLen / 2);
+    }
+
+    ++(pCurrHist->bin[pPairStats->fragLen - pCurrHist->lowerBound]);
+    ++(pCurrHist->total);
+    ++(pDstrb->pairModeCount[SR_PairModeMap[pPairStats->pairMode]]);
+
+    if (pPairStats->fragLen > pCurrHist->max)
+    {
+        pCurrHist->max = pPairStats->fragLen;
+    }
+    else if (pPairStats->fragLen < pCurrHist->min)
+    {
+        pCurrHist->min = pPairStats->fragLen;
+    }
+
+    if (pCurrHist->bin[pPairStats->fragLen - pCurrHist->lowerBound] > pCurrHist->bin[pCurrHist->mode])
+    {
+        pCurrHist->mode = pPairStats->fragLen - pCurrHist->lowerBound;
+    }
+
+    return SR_OK;
+}

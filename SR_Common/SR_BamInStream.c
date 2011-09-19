@@ -381,6 +381,7 @@ SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo,
     return ret;
 }
 
+
 unsigned int SR_BamInStreamShrinkPool(SR_BamInStream* pBamInStream, unsigned int newSize)
 {
     unsigned int currSize = pBamInStream->pMemPool->numBuffs;

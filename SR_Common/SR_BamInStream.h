@@ -262,4 +262,5 @@ inline SR_Status SR_BamInStreamPush(SR_BamInStream* pBamInStream, SR_BamNode* pA
 //================================================================
 unsigned int SR_BamInStreamShrinkPool(SR_BamInStream* pBamInStream, unsigned int newSize);
 
+
 #endif  /*SR_BAMINSTREAM_H*/

@@ -31,6 +31,8 @@ typedef enum
     SR_OK  =           0,
     SR_EOF =          -1,
     SR_ERR =          -2,
+    SR_FULL      =    -98,
+    SR_NOT_FOUND =    -99,
     SR_OUT_OF_RANGE = -100
 
 }SR_Status;
@@ -57,7 +59,7 @@ typedef enum
 // action applied on a certain DNA sequence
 typedef enum
 {
-    SR_FORWARD,         // leave the sequence as the format read from bam file
+    SR_FORWARD,
 
     SR_REVERSE_COMP,    // change the sequence to its reverse complement format
 
@@ -66,6 +68,28 @@ typedef enum
     SR_COMP
 
 }SR_SeqAction;
+
+typedef enum
+{
+    SR_1F = 0,
+    SR_1R = 1,
+    SR_2F = 2,
+    SR_2R = 3
+
+}SR_SingleMode;
+
+typedef enum
+{
+    SR_1F2F = ((SR_1F << 2) | SR_2F),
+    SR_1F2R = ((SR_1F << 2) | SR_2R),
+    SR_1R2F = ((SR_1R << 2) | SR_2F),
+    SR_1R2R = ((SR_1R << 2) | SR_2R),
+    SR_2F1F = ((SR_2F << 2) | SR_1F),
+    SR_2F1R = ((SR_2F << 2) | SR_1R),
+    SR_2R1F = ((SR_2R << 2) | SR_1F),
+    SR_2R1R = ((SR_2R << 2) | SR_1R)
+
+}SR_PairMode;
 
 typedef SR_SeqAction SR_Strand;
 

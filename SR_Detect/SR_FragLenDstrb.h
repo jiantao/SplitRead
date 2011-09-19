@@ -18,11 +18,28 @@
 #ifndef  SR_FRAGLENDSTRB_H
 #define  SR_FRAGLENDSTRB_H
 
-#include <gsl/gsl_histogram.h>
-
 #include "bam.h"
 #include "SR_Types.h"
 #include "SR_BamHeader.h"
+#include "SR_BamPairAux.h"
+
+typedef struct SR_FragLenHist
+{
+    uint64_t* bin;
+
+    uint32_t size;
+
+    uint32_t lowerBound;
+
+    uint32_t min;
+
+    uint32_t max;
+
+    uint32_t mode;
+
+    uint64_t total;
+
+}SR_FragLenHist;
 
 typedef struct SR_FragLenDstrb
 {
@@ -30,15 +47,13 @@ typedef struct SR_FragLenDstrb
 
     void* pReadGrpHash;
 
-    gsl_histogram** pFragLenHists;
+    SR_FragLenHist* pHists;
 
     uint32_t size;
 
     uint32_t capacity;
 
-    double (*pFragLenRange)[2];
-
-    uint64_t modeCount[8];
+    uint64_t pairModeCount[8];
 
     unsigned short minMQ;
 
@@ -46,24 +61,9 @@ typedef struct SR_FragLenDstrb
 
 }SR_FragLenDstrb;
 
+uint32_t SR_FragLenHistGetMean(const SR_FragLenHist* pHist);
 
-inline SR_SingleOrnt SR_BamGetOrnt(bam1_t* pAlgn)
-{
-    if ((pAlgn->core.flag & BAM_FREAD1) != 0)
-    {
-        if ((pAlgn->core.flag & BAM_FREVERSE) == 0)
-            return SR_1F;
-        else
-            return SR_1R;
-    }
-    else
-    {
-        if ((pAlgn->core.flag & BAM_FREVERSE) == 0)
-            return SR_2F;
-        else
-            return SR_2R;
-    }
-}
+uint32_t SR_FragLenHistGetMedian(const SR_FragLenHist* pHist);
 
 SR_FragLenDstrb* SR_FragLenDstrbAlloc(unsigned short minMQ, uint32_t capacity);
 
@@ -71,8 +71,6 @@ void SR_FragLenDstrbFree(SR_FragLenDstrb* pDstrb);
 
 SR_Status SR_FragLenDstrbSetRG(SR_FragLenDstrb* pDstrb, const SR_BamHeader* pBamHeader);
 
-void SR_FragLenDstrbInitRange(SR_FragLenDstrb* pSstrb);
-
-void SR_FragLenDstrbInitHists(SR_FragLenDstrb* pDstrb);
+SR_Status SR_FragLenDstrbUpdate(SR_FragLenDstrb* pDstrb, const SR_BamPairStats* pPairStats);
 
 #endif  /*SR_FRAGLENDSTRB_H*/
