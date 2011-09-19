@@ -16,8 +16,9 @@
  * =====================================================================================
  */
 
-#ifndef  SR_BAMPAIRAUX_C
-#define  SR_BAMPAIRAUX_C
+#ifndef  SR_BAMPAIRAUX_H
+#define  SR_BAMPAIRAUX_H
+
 
 #include "SR_Types.h"
 #include "SR_BamMemPool.h"
@@ -31,7 +32,7 @@
 
 // a map used to map the pair mode into its corresponding number
 // negative value means invalid mode
-const int SR_PairModeMap[16] = { 
+static const int SR_PairModeMap[16] = { 
                                    -1, -1, 0, 1,
 
                                    -1, -1, 2, 3,
@@ -40,7 +41,6 @@ const int SR_PairModeMap[16] = {
 
                                    6, 7, -1, -1
                                };
-
 
 // the object used to hold the basic statistics of a pair of alignments
 typedef struct SR_BamPairStats
@@ -184,4 +184,4 @@ inline SR_Bool SR_IsNormalPair(SR_BamNode** ppUpAlgn, SR_BamNode** ppDownAlgn, u
 SR_Status SR_BamPairStatsLoad(SR_BamPairStats* pPairStats, SR_BamNode* pUpAlgn, SR_BamNode* pDownAlgn);
 
     
-#endif  /*SR_BAMPAIRAUX_C*/
+#endif  /*SR_BAMPAIRAUX_H*/
