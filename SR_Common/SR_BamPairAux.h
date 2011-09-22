@@ -33,14 +33,24 @@
 // a map used to map the pair mode into its corresponding number
 // negative value means invalid mode
 static const int SR_PairModeMap[16] = { 
-                                   -1, -1, 0, 1,
+                                          -1, -1, 0, 1,
 
-                                   -1, -1, 2, 3,
+                                          -1, -1, 2, 3,
 
-                                   4, 5, -1, -1,
+                                          4, 5, -1, -1,
 
-                                   6, 7, -1, -1
-                               };
+                                          6, 7, -1, -1
+                                      };
+
+static const int SR_PairModeSetMap[64] =  { 0, 0, 0, 1, 0, 0, 0, 1,
+                                            0, 0, 1, 0, 0, 1, 0, 0,
+                                            0, 1, 0, 0, 0, 0, 1, 0,
+                                            1, 0, 0, 0, 1, 0, 0, 0,
+                                            0, 0, 0, 1, 0, 0, 0, 1,
+                                            0, 1, 0, 0, 0, 0, 1, 0,
+                                            0, 0, 1, 0, 0, 1, 0, 0,
+                                            1, 0, 0, 0, 1, 0, 0, 0
+                                          };
 
 // the object used to hold the basic statistics of a pair of alignments
 typedef struct SR_BamPairStats
@@ -133,7 +143,7 @@ inline SR_SingleMode SR_BamGetSingleMode(bam1_t* pAlgn)
 // return:
 //      the mode of the pair
 //==================================================================
-#define SR_BamGetPairMode(upMode, downMode) (((upMode) << 2) | (downMode))
+#define SR_BamGetPairMode(upMode, downMode) (SR_PairModeMap[((upMode) << 2) | (downMode)])
 
 //====================================================================
 // function:

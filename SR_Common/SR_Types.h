@@ -80,14 +80,14 @@ typedef enum
 
 typedef enum
 {
-    SR_1F2F = ((SR_1F << 2) | SR_2F),
-    SR_1F2R = ((SR_1F << 2) | SR_2R),
-    SR_1R2F = ((SR_1R << 2) | SR_2F),
-    SR_1R2R = ((SR_1R << 2) | SR_2R),
-    SR_2F1F = ((SR_2F << 2) | SR_1F),
-    SR_2F1R = ((SR_2F << 2) | SR_1R),
-    SR_2R1F = ((SR_2R << 2) | SR_1F),
-    SR_2R1R = ((SR_2R << 2) | SR_1R)
+    SR_1F2F = 0,
+    SR_1F2R = 1,
+    SR_1R2F = 2,
+    SR_1R2R = 3,
+    SR_2F1F = 4,
+    SR_2F1R = 5,
+    SR_2R1F = 6,
+    SR_2R1R = 7
 
 }SR_PairMode;
 
