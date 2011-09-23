@@ -74,34 +74,6 @@ typedef struct SR_FragLenDstrb
 
 }SR_FragLenDstrb;
 
-typedef struct SR_FragLenTable
-{
-    char** pReadGrpNames;
-
-    void* pReadGrpHash;
-
-    uint8_t* pairMode;
-
-    uint64_t* totalFreq;
-
-    double* mean;
-
-    double* median;
-
-    double* stdev;
-
-    uint32_t* histIndex;
-
-    uint32_t* fragLen;
-
-    double*   cdf;
-
-    uint32_t size;
-
-    SR_Bool hasRG;
-
-}SR_FragLenTable;
-
 SR_FragLenDstrb* SR_FragLenDstrbAlloc(unsigned short minMQ, uint32_t capacity);
 
 void SR_FragLenDstrbFree(SR_FragLenDstrb* pDstrb);
@@ -113,13 +85,5 @@ SR_Status SR_FragLenDstrbUpdate(SR_FragLenDstrb* pDstrb, const SR_BamPairStats* 
 void SR_FragLenDstrbFinalize(SR_FragLenDstrb* pDstrb);
 
 void SR_FragLenDstrbWrite(const SR_FragLenDstrb* pDstrb, FILE* dstrbOutput);
-
-
-
-SR_FragLenTable* SR_FragLenTableAlloc(void);
-
-void SR_FragLenTableFree(SR_FragLenTable* pFragLenTable);
-
-void SR_FragLenTableRead(pFragLenTable* pFragLenTable, FILE* fragLenInput);
 
 #endif  /*SR_FRAGLENDSTRB_H*/

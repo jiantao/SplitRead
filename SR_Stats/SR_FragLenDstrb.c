@@ -41,49 +41,6 @@ KHASH_MAP_INIT_STR(readGrpName, uint32_t);
 // fragment length hash
 KHASH_MAP_INIT_INT(fragLen, uint64_t);
 
-/*  
-static void SR_FragLenHistInit(SR_FragLenHist* pHist, uint32_t fragLen)
-{
-    pHist->min = fragLen;
-    pHist->max = fragLen;
-
-    pHist->lowerBound = fragLen / 2;
-    pHist->size = fragLen * 2 - pHist->lowerBound;
-
-    pHist->bin = (uint64_t*) calloc(pHist->size, sizeof(uint64_t));
-    if (pHist->bin == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the fragment length histogram object.\n");
-}
-
-static void SR_FragLenHistResize(SR_FragLenHist* pHist, uint32_t newBound)
-{
-    if (newBound >= pHist->lowerBound + pHist->size)
-    {
-        uint32_t newSize = newBound - pHist->lowerBound;
-        pHist->bin = (uint64_t*) realloc(pHist->bin, newSize * sizeof(uint64_t));
-        if (pHist->bin == NULL)
-            SR_ErrQuit("ERROR: Not enough memory for the storage of bins in the histogram object.\n");
-
-        memset(pHist->bin + pHist->size, 0, newSize - pHist->size);
-        pHist->size = newSize;
-    }
-    else if (newBound < pHist->lowerBound)
-    {
-        size_t newSize = pHist->lowerBound + pHist->size - newBound;
-        uint64_t* newBin = calloc(newSize, sizeof(uint64_t));
-        if (newBin == NULL)
-            SR_ErrQuit("ERROR: Not enough memory for the storage of bins in the histogram object.\n");
-
-        memcpy(newBin + (newSize - pHist->size), pHist->bin, pHist->size * sizeof(uint64_t));
-        free(pHist->bin);
-        pHist->bin = newBin;
-
-        pHist->lowerBound = newBound;
-        pHist->size = newSize;
-    }
-}
-
-*/
 static inline void SR_FragLenHistClearRaw(SR_FragLenHist* pHist)
 {
     for (unsigned int i = 0; i != NUM_PAIR_MODE; ++i)

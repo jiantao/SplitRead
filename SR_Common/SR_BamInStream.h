@@ -69,8 +69,9 @@ SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename,        // name of i
                                      
                                     unsigned int buffCapacity,      // the number of alignments can be stored in each chunk of the memory pool
                                     
-                                    unsigned int reportSize);       // number of alignments should be cached before report
+                                    unsigned int reportSize,        // number of alignments should be cached before report
                                     
+                                    SR_Bool useBamIndex);           // flag used to indicate that if we want to use the bam index file or not
 
 void SR_BamInStreamFree(SR_BamInStream* pBamInStream);
 
