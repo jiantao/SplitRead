@@ -16,8 +16,6 @@
  * =====================================================================================
  */
 
-#include <assert.h>
-
 #include "bam.h"
 #include "SR_BamPairAux.h"
 
@@ -125,8 +123,7 @@ SR_Status SR_BamPairStatsLoad(SR_BamPairStats* pPairStats, SR_BamNode* pUpAlgn, 
     if (pPairStats->pairMode < 0)
         return SR_ERR;
 
-    assert(pUpAlgn->alignment.core.isize > 0);
-    pPairStats->fragLen = pUpAlgn->alignment.core.isize;
+    pPairStats->fragLen = abs(pUpAlgn->alignment.core.isize);
 
     static const char tagRG[2] = {'R', 'G'};
     uint8_t* rgPos = bam_aux_get(&(pUpAlgn->alignment), tagRG);
