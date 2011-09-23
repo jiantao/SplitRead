@@ -27,6 +27,13 @@
 // Type and constant definition
 //===============================
 
+enum BamIndexFlag
+{
+    NOT_USE_BAM_INDEX   = 0,
+
+    USE_BAM_INDEX       = 1
+};
+
 // private data structure that holds all bam-input-related information
 typedef struct SR_BamInStream
 {
@@ -71,7 +78,8 @@ SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename,        // name of i
                                     
                                     unsigned int reportSize,        // number of alignments should be cached before report
                                     
-                                    SR_Bool useBamIndex);           // flag used to indicate that if we want to use the bam index file or not
+                                    unsigned char bamIndexFlag);    // flag used to indicate that if we want to use the bam index file or not
+                                                                    // valid value: USE_BAM_INDEX, NOT_USE_BAM_INDEX
 
 void SR_BamInStreamFree(SR_BamInStream* pBamInStream);
 

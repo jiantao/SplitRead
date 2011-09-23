@@ -118,7 +118,7 @@ static void SR_BamInStreamReset(SR_BamInStream* pBamInStream)
 // Constructors and Destructors
 //===============================
 
-SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, unsigned int numThreads, unsigned int buffCapacity, unsigned int reportSize, SR_Bool useBamIndex)
+SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, unsigned int numThreads, unsigned int buffCapacity, unsigned int reportSize, unsigned char bamIndexFlag)
 {
     SR_BamInStream* pBamInStream = (SR_BamInStream*) calloc(1, sizeof(SR_BamInStream));
     if (pBamInStream == NULL)
@@ -128,7 +128,7 @@ SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, un
     if (pBamInStream->fpBamInput == NULL)
         SR_ErrQuit("ERROR: Cannot open bam file %s for reading.\n", bamFilename);
 
-    if (useBamIndex)
+    if (bamIndexFlag == USE_BAM_INDEX)
     {
         pBamInStream->pBamIndex = bam_index_load(bamFilename);
         if (pBamInStream->pBamIndex == NULL)
