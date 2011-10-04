@@ -24,35 +24,31 @@
 #include "SR_BamHeader.h"
 #include "SR_BamPairAux.h"
 
-#define NUM_PAIR_MODE 8
+#define NUM_TOTAL_PAIR_MODE 8
 
-#define NUM_TOP_PAIR_MODE 2
+#define NUM_ALLOWED_PAIR_MODE 4
 
-typedef struct SR_PairModeBin
-{
-    SR_PairMode pairMode;
+#define NUM_ALLOWED_HIST 2
 
-    uint64_t freq;
-
-}SR_PairModeBin;
+#define INVALID_PAIR_MODE_SET_INDEX 2
 
 typedef struct SR_FragLenHist
 {
-    void* rawHist[NUM_PAIR_MODE];
+    void* rawHist[NUM_ALLOWED_HIST];
 
-    uint32_t* fragLen;
+    uint32_t* fragLen[NUM_ALLOWED_HIST];
 
-    double* cdf;
+    double* cdf[NUM_ALLOWED_HIST];
 
-    double mean;
+    double mean[NUM_ALLOWED_HIST];
 
-    double median;
+    double median[NUM_ALLOWED_HIST];
 
-    double stdev;
+    double stdev[NUM_ALLOWED_HIST];
 
-    uint32_t size;
+    uint32_t size[NUM_ALLOWED_HIST];
 
-    SR_PairModeBin modeCount[NUM_PAIR_MODE];
+    uint64_t modeCount[NUM_ALLOWED_HIST + 1];
 
 }SR_FragLenHist;
 
@@ -63,6 +59,10 @@ typedef struct SR_FragLenDstrb
     void* pReadGrpHash;
 
     SR_FragLenHist* pHists;
+
+    int8_t validModeMap[NUM_TOTAL_PAIR_MODE];
+    
+    uint8_t numPairMode;
 
     uint32_t size;
 
@@ -77,6 +77,8 @@ typedef struct SR_FragLenDstrb
 SR_FragLenDstrb* SR_FragLenDstrbAlloc(unsigned short minMQ, uint32_t capacity);
 
 void SR_FragLenDstrbFree(SR_FragLenDstrb* pDstrb);
+
+SR_Status SR_FragLenDstrbSetPairMode(SR_FragLenDstrb* pDstrb, const char* cmdArg);
 
 SR_Status SR_FragLenDstrbSetRG(SR_FragLenDstrb* pDstrb, const SR_BamHeader* pBamHeader);
 

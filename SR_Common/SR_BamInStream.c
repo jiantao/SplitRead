@@ -36,6 +36,8 @@
 // default capacity of a bam array
 #define DEFAULT_BAM_ARRAY_CAP 200
 
+#define SR_MAX_BIN_LEN 500000000
+
 // a mask used to filter out those unwanted reads for split alignments
 // it includes proper paired reads, secondar reads, qc-failed reads and duplicated reads
 #define SR_BAM_FMASK (BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP)
@@ -94,6 +96,9 @@ static inline int SR_BamInStreamLoadNext(SR_BamInStream* pBamInStream)
     // and update the query name hash since the address of those
     // bam alignments are changed after expanding
     pBamInStream->pNewNode = SR_BamNodeAlloc(pBamInStream->pMemPool);
+    if (pBamInStream->pNewNode == NULL)
+        SR_ErrQuit("ERROR: Too many unpaired reads are stored in the memory. Please use smaller bin size or disable searching pair genomically.\n");
+
     int ret = bam_read1(pBamInStream->fpBamInput, &(pBamInStream->pNewNode->alignment));
 
     return ret;
@@ -118,7 +123,7 @@ static void SR_BamInStreamReset(SR_BamInStream* pBamInStream)
 // Constructors and Destructors
 //===============================
 
-SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, unsigned int numThreads, unsigned int buffCapacity, unsigned int reportSize, unsigned char bamIndexFlag)
+SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, unsigned int numThreads, unsigned int buffCapacity, unsigned int reportSize, const SR_StreamMode* pStreamMode)
 {
     SR_BamInStream* pBamInStream = (SR_BamInStream*) calloc(1, sizeof(SR_BamInStream));
     if (pBamInStream == NULL)
@@ -128,13 +133,14 @@ SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, un
     if (pBamInStream->fpBamInput == NULL)
         SR_ErrQuit("ERROR: Cannot open bam file %s for reading.\n", bamFilename);
 
-    if (bamIndexFlag == USE_BAM_INDEX)
+    if ((pStreamMode->controlFlag & SR_USE_BAM_INDEX) != 0)
     {
         pBamInStream->pBamIndex = bam_index_load(bamFilename);
         if (pBamInStream->pBamIndex == NULL)
             SR_ErrMsg("WARNING: Cannot open bam index file for reading. No jump allowed.\n");
     }
 
+    pBamInStream->filterFunc = pStreamMode->filterFunc;
     pBamInStream->numThreads = numThreads;
     pBamInStream->reportSize = reportSize;
     pBamInStream->currRefID = NO_QUERY_YET;
@@ -151,8 +157,16 @@ SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, un
     else
         pBamInStream->pRetLists = NULL;
 
-    pBamInStream->pNameHashes[PREV_BIN] = kh_init(queryName);
-    kh_resize(queryName, pBamInStream->pNameHashes[PREV_BIN], reportSize);
+    if ((pStreamMode->controlFlag & SR_PAIR_GENOMICALLY) == 0)
+    {
+        pBamInStream->pNameHashes[PREV_BIN] = kh_init(queryName);
+        kh_resize(queryName, pBamInStream->pNameHashes[PREV_BIN], reportSize);
+    }
+    else
+    {
+        pBamInStream->pNameHashes[PREV_BIN] = NULL;
+        pBamInStream->binLen = SR_MAX_BIN_LEN;
+    }
 
     pBamInStream->pNameHashes[CURR_BIN] = kh_init(queryName);
     kh_resize(queryName, pBamInStream->pNameHashes[CURR_BIN], reportSize);
@@ -282,7 +296,7 @@ SR_BamHeader* SR_BamInStreamLoadHeader(SR_BamInStream* pBamInStream)
 }
 
 // load a unique-orphan pair from a bam file
-SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo, SR_BamInStream* pBamInStream) 
+SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo, const void* filterData, SR_BamInStream* pBamInStream) 
 {
     (*ppAlgnOne) = NULL;
     (*ppAlgnTwo) = NULL;
@@ -295,19 +309,19 @@ SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo,
     {
         // exclude those reads who are non-paired-end, qc-fail, duplicate-marked, proper-paired, 
         // both aligned, secondary-alignment and no-name-specified.
-        if ((pBamInStream->pNewNode->alignment.core.flag & SR_BAM_FMASK) != 0
-            || strcmp(bam1_qname(&(pBamInStream->pNewNode->alignment)), "*") == 0)
+        SR_Bool shouldBeFiltered = pBamInStream->filterFunc(pBamInStream->pNewNode, filterData);
+        if (shouldBeFiltered)
         {
             SR_BamNodeFree(pBamInStream->pNewNode, pBamInStream->pMemPool);
             pBamInStream->pNewNode = NULL;
             continue;
-
         }
 
         // update the current ref ID or position if the incoming alignment has a 
         // different value. The name hash and the bam array will be reset
-        if (pBamInStream->pNewNode->alignment.core.tid != pBamInStream->currRefID
-            || pBamInStream->pNewNode->alignment.core.pos >= pBamInStream->currBinPos + 2 * pBamInStream->binLen)
+        if (pNameHashPrev != NULL 
+            && (pBamInStream->pNewNode->alignment.core.tid != pBamInStream->currRefID
+            || pBamInStream->pNewNode->alignment.core.pos >= pBamInStream->currBinPos + 2 * pBamInStream->binLen))
         {
             if (pBamInStream->pNewNode->alignment.core.tid != pBamInStream->currRefID)
             {
@@ -341,10 +355,12 @@ SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo,
         (*ppAlgnOne) = NULL;
         (*ppAlgnTwo) = NULL;
 
-        khiter_t khIter;
-        khIter = kh_get(queryName, pNameHashPrev, bam1_qname(&(pBamInStream->pNewNode->alignment)));
+        khiter_t khIter = 0;
 
-        if (khIter != kh_end(pNameHashPrev))
+        if (pNameHashPrev != NULL)
+            khIter = kh_get(queryName, pNameHashPrev, bam1_qname(&(pBamInStream->pNewNode->alignment)));
+
+        if (pNameHashPrev != NULL && khIter != kh_end(pNameHashPrev))
         {
             ret = SR_OK;
             (*ppAlgnOne) = kh_value(pNameHashPrev, khIter);
@@ -389,7 +405,6 @@ SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo,
 
     return ret;
 }
-
 
 unsigned int SR_BamInStreamShrinkPool(SR_BamInStream* pBamInStream, unsigned int newSize)
 {

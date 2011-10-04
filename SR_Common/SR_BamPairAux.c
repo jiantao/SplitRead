@@ -95,7 +95,7 @@ SR_Status SR_LoadUniquOrphanPairs(SR_BamInStream* pBamInStream, unsigned int thr
 
     SR_Status readerStatus = SR_OK;
     SR_Status bufferStatus = SR_OK;
-    while ((readerStatus = SR_BamInStreamLoadPair(&pAnchor, &pOrphan, pBamInStream)) == SR_OK)
+    while ((readerStatus = SR_BamInStreamLoadPair(&pAnchor, &pOrphan, NULL, pBamInStream)) == SR_OK)
     {
         if (SR_IsUniqueOrphanPair(&pAnchor, &pOrphan, scTolerance))
         {

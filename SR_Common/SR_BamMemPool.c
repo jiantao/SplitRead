@@ -22,6 +22,8 @@
 #include "SR_Error.h"
 #include "SR_BamMemPool.h"
 
+#define SR_MAX_MEM_POOL_SIZE 2000000
+
 static inline SR_Bool SR_BamListIsEmpty(SR_BamList* pList)
 {
     return (pList->numNode == 0);
@@ -31,7 +33,9 @@ SR_BamNode* SR_BamNodeAlloc(SR_BamMemPool* pMemPool)
 {
     if (SR_BamListIsEmpty(&(pMemPool->avlNodeList)))
     {
-        SR_BamMemPoolExpand(pMemPool);
+        SR_Status memStatus = SR_BamMemPoolExpand(pMemPool);
+        if (memStatus == SR_OVER_FLOW)
+            return NULL;
     }
 
     SR_BamNode* pNewNode = SR_BamListPopHead(&(pMemPool->avlNodeList));
@@ -191,8 +195,11 @@ void SR_BamBuffClear(SR_BamBuff* pBuff, SR_BamMemPool* pMemPool)
     }
 }
 
-void SR_BamMemPoolExpand(SR_BamMemPool* pMemPool)
+SR_Status SR_BamMemPoolExpand(SR_BamMemPool* pMemPool)
 {
+    if ((pMemPool->numBuffs + 1) * pMemPool->buffCapacity > SR_MAX_MEM_POOL_SIZE)
+        return SR_OVER_FLOW;
+
     SR_BamBuff* pNewBuff = SR_BamBuffAlloc(pMemPool->buffCapacity);
 
     pNewBuff->nextBuff = pMemPool->pFirstBuff;
@@ -200,6 +207,8 @@ void SR_BamMemPoolExpand(SR_BamMemPool* pMemPool)
 
     SR_BamListMergeHead(&(pMemPool->avlNodeList), &(pNewBuff->pNodeArray[0]), &(pNewBuff->pNodeArray[pMemPool->buffCapacity - 1]), pMemPool->buffCapacity);
     ++(pMemPool->numBuffs);
+
+    return SR_OK;
 }
 
 SR_BamMemPool* SR_BamMemPoolAlloc(unsigned int buffCapacity)

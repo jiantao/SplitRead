@@ -27,12 +27,25 @@
 // Type and constant definition
 //===============================
 
-enum BamIndexFlag
-{
-    NOT_USE_BAM_INDEX   = 0,
+typedef SR_Bool (*SR_BamFilter) (const SR_BamNode* pBamNode, const void* pFilterData);
 
-    USE_BAM_INDEX       = 1
-};
+typedef enum SR_StreamControlFlag
+{
+    SR_NO_SPECIAL_CONTROL = 0,
+
+    SR_USE_BAM_INDEX      = 1,   // bam in stream will open the bam index file and load it into memory
+
+    SR_PAIR_GENOMICALLY   = 2    // bam in stream will find read pairs genomically
+
+}SR_StreamControlFlag;
+
+typedef struct SR_StreamMode
+{
+    SR_BamFilter filterFunc;
+
+    SR_StreamControlFlag controlFlag;
+
+}SR_StreamMode;
 
 // private data structure that holds all bam-input-related information
 typedef struct SR_BamInStream
@@ -40,6 +53,8 @@ typedef struct SR_BamInStream
     bamFile fpBamInput;                        // file pointer to a input bam file
 
     bam_index_t* pBamIndex;                    // file pointer to a input bam index file
+
+    SR_BamFilter filterFunc;                   // customized filter function 
 
     SR_BamMemPool* pMemPool;                   // memory pool used to allocate and recycle the bam alignments
 
@@ -68,18 +83,18 @@ typedef struct SR_BamInStream
 // Constructors and Destructors
 //===============================
 
-SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename,        // name of input bam file
-        
-                                    uint32_t binLen,                // search range of a pair
+SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename,               // name of input bam file
                                     
-                                    unsigned int numThreads,        // number of threads
+                                    uint32_t binLen,                       // search range of a pair
+                                    
+                                    unsigned int numThreads,               // number of threads
                                      
-                                    unsigned int buffCapacity,      // the number of alignments can be stored in each chunk of the memory pool
+                                    unsigned int buffCapacity,             // the number of alignments can be stored in each chunk of the memory pool
                                     
-                                    unsigned int reportSize,        // number of alignments should be cached before report
+                                    unsigned int reportSize,               // number of alignments should be cached before report
                                     
-                                    unsigned char bamIndexFlag);    // flag used to indicate that if we want to use the bam index file or not
-                                                                    // valid value: USE_BAM_INDEX, NOT_USE_BAM_INDEX
+                                    const SR_StreamMode* pStreamMode);     // a structure used to control the features of the stream
+
 
 void SR_BamInStreamFree(SR_BamInStream* pBamInStream);
 
@@ -137,7 +152,7 @@ SR_BamHeader* SR_BamInStreamLoadHeader(SR_BamInStream* pBamInStream);
 //      beginning of an alignment. Upon success, the position 
 //      indicator will be set at the start of the next alignment
 //================================================================ 
-inline SR_Status SR_BamInStreamRead(bam1_t* pAlignment, SR_BamInStream* pBamInStream)
+static inline SR_Status SR_BamInStreamRead(bam1_t* pAlignment, SR_BamInStream* pBamInStream)
 {
     int ret = bam_read1(pBamInStream->fpBamInput, pAlignment);
 
@@ -176,7 +191,7 @@ inline SR_Status SR_BamInStreamRead(bam1_t* pAlignment, SR_BamInStream* pBamInSt
 //      the current chromosome, return SR_OUT_OF_RANGE; 
 //      else, return SR_ERR
 //==================================================================
-SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo, SR_BamInStream* pBamInStream);
+SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo, const void* filterData, SR_BamInStream* pBamInStream);
 
 //================================================================
 // function:
@@ -217,7 +232,7 @@ SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo,
 //      status of the thread buffer. if the thread buffer is full
 //      then return SR_FULL else return SR_OK
 //================================================================ 
-inline SR_Status SR_BamInStreamPush(SR_BamInStream* pBamInStream, SR_BamNode* pAlignment, unsigned int threadID)
+static inline SR_Status SR_BamInStreamPush(SR_BamInStream* pBamInStream, SR_BamNode* pAlignment, unsigned int threadID)
 {
     SR_BamListPushBack(pBamInStream->pRetLists + threadID, pAlignment);
 

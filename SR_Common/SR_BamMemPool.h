@@ -76,7 +76,7 @@ SR_BamNode* SR_BamNodeAlloc(SR_BamMemPool* pMemPool);
 
 #define SR_BamNodeFree(pNode, pMemPool)  SR_BamListPushHead(&((pMemPool)->avlNodeList), (pNode))
 
-inline SR_BamListIter SR_BamListGetIter(SR_BamList* pList)
+static inline SR_BamListIter SR_BamListGetIter(SR_BamList* pList)
 {
     return pList->first;
 }
@@ -107,7 +107,7 @@ void SR_BamMemPoolFree(SR_BamMemPool* pMemPool);
 
 #define SR_BamMemPoolGetSize(pMemPool) ((pMemPool)->numBuffs)
 
-void SR_BamMemPoolExpand(SR_BamMemPool* pMemPool);
+SR_Status SR_BamMemPoolExpand(SR_BamMemPool* pMemPool);
 
 
 #endif  /*SR_BAMMEMPOOL_H*/

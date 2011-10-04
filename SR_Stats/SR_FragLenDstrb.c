@@ -3,7 +3,7 @@
  *
  *       Filename:  SR_FragLenDstrb.c
  *
- *    Description:  
+ *    jescription:  
  *
  *        Version:  1.0
  *        Created:  09/15/2011 03:43:08 PM
@@ -41,29 +41,7 @@ KHASH_MAP_INIT_STR(readGrpName, uint32_t);
 // fragment length hash
 KHASH_MAP_INIT_INT(fragLen, uint64_t);
 
-static inline void SR_FragLenHistClearRaw(SR_FragLenHist* pHist)
-{
-    for (unsigned int i = 0; i != NUM_PAIR_MODE; ++i)
-    {
-        kh_destroy(fragLen, pHist->rawHist[i]);
-        pHist->rawHist[i] = NULL;
-    }
-}
-
-static inline void SR_FragLenHistClear(SR_FragLenHist* pHist)
-{
-    SR_FragLenHistClearRaw(pHist);
-
-    for (unsigned int i = 0; i != NUM_TOP_PAIR_MODE; ++i)
-    {
-        free(pHist->fragLen);
-        free(pHist->cdf);
-
-        pHist->fragLen = NULL;
-        pHist->cdf = NULL;
-    }
-}
-
+/* 
 // we sort the pair mode count array decreasingly 
 static int ComparePairModeBin(const void* a, const void* b)
 {
@@ -78,27 +56,15 @@ static int ComparePairModeBin(const void* a, const void* b)
        return 0;
 }
 
-static int CompareFragLenBin(const void* a, const void* b)
+static inline SR_Bool SR_IsValidPairModeSet(SR_PairMode modeOne, SR_PairMode modeTwo)
 {
-    const SR_FragLenBin* pBinOne = a;
-    const SR_FragLenBin* pBinTwo = b;
-
-   if (pBinOne->fragLen > pBinTwo->fragLen)
-       return 1;
-   else if (pBinOne->fragLen < pBinTwo->fragLen)
-       return -1;
-   else
-       return 0;
-}
-
-static inline SR_Bool SR_IsValidPairModeSet(const SR_PairModeBin* pBestBin, const SR_PairModeBin* pSecBestBin)
-{
-    unsigned int pairModeSet = (pBestBin->pairMode << 3 | pSecBestBin->pairMode);
+    unsigned int pairModeSet = (modeOne << 3 | modeTwo);
     if (SR_PairModeSetMap[pairModeSet] == 1)
         return TRUE;
     else
         return FALSE;
 }
+
 
 static void SR_FragLenHistMergeRaw(SR_FragLenHist* pHist)
 {
@@ -122,71 +88,6 @@ static void SR_FragLenHistMergeRaw(SR_FragLenHist* pHist)
     pHist->rawHist[pHist->modeCount[0].pairMode] = pBestRaw;
 }
 
-static void SR_FragLenHistToMature(SR_FragLenHist* pHist)
-{
-    const khash_t(fragLen)* pBestRaw = pHist->rawHist[pHist->modeCount[0].pairMode];
-    SR_FragLenBin* matureHist = (SR_FragLenBin*) malloc(kh_size(pBestRaw) * sizeof(SR_FragLenBin));
-    if (matureHist == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the histogram in the fragment length distribution object.\n");
-
-    pHist->size = kh_size(pBestRaw);
-
-    unsigned int i = 0;
-    for (khiter_t khIter = kh_begin(pBestRaw); khIter != kh_end(pBestRaw); ++khIter)
-    {
-        if (kh_exist(pBestRaw, khIter))
-        {
-            matureHist[i].fragLen = kh_key(pBestRaw, khIter);
-            matureHist[i].freq = kh_value(pBestRaw, khIter);
-            ++i;
-        }
-    }
-
-    qsort(matureHist, pHist->size, sizeof(SR_FragLenBin), CompareFragLenBin);
-
-    pHist->fragLen = (uint32_t*) malloc(pHist->size * sizeof(uint32_t));
-    if (pHist->fragLen == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the storeage of the fragment length array in the fragment length histogram.\n");
-
-    pHist->cdf = (double*) malloc(pHist->size * sizeof(double));
-    if (pHist->cdf == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the storeage of the cdf in the fragment length histogram.\n");
-
-    double cumFreq = 0.0;
-    double totalFragLen = 0.0;
-    uint64_t totalFreq = pHist->modeCount[0].freq + pHist->modeCount[1].freq;
-    for (unsigned int j = 0; j != pHist->size; ++j)
-    {
-        totalFragLen += matureHist[j].fragLen * matureHist[j].freq;
-        pHist->fragLen[j] = matureHist[j].fragLen;
-        cumFreq += matureHist[j].freq;
-        pHist->cdf[j] = cumFreq / totalFreq;
-    }
-
-    pHist->mean = totalFragLen / totalFreq;
-
-    for (unsigned int j = 0; j != pHist->size; ++j)
-    {
-        if (pHist->cdf[j] >= 0.5)
-        {
-            pHist->median = pHist->fragLen[j];
-            break;
-        }
-    }
-
-    pHist->stdev = 0.0;
-    for (unsigned int j = 0; j != pHist->size; ++j)
-    {
-        pHist->stdev += (double) matureHist[j].freq * pow(pHist->mean - matureHist[j].fragLen, 2);
-    }
-
-    if (totalFreq != 1)
-        pHist->stdev = sqrt(pHist->stdev / (double) (totalFreq - 1));
-
-    free(matureHist);
-}
-
-
 static SR_Status SR_FragLenHistSetMature(SR_FragLenHist* pHist)
 {
     qsort(pHist->modeCount, NUM_PAIR_MODE, sizeof(SR_PairModeBin), ComparePairModeBin);
@@ -206,6 +107,114 @@ static SR_Status SR_FragLenHistSetMature(SR_FragLenHist* pHist)
     else
         return SR_ERR;
 }
+*/
+
+static inline void SR_FragLenHistClearRaw(SR_FragLenHist* pHist)
+{
+    for (unsigned int i = 0; i != NUM_ALLOWED_HIST; ++i)
+    {
+        kh_destroy(fragLen, pHist->rawHist[i]);
+        pHist->rawHist[i] = NULL;
+    }
+}
+
+static inline void SR_FragLenHistClear(SR_FragLenHist* pHist)
+{
+    SR_FragLenHistClearRaw(pHist);
+
+    for (unsigned int i = 0; i != NUM_ALLOWED_HIST; ++i)
+    {
+        free(pHist->fragLen[i]);
+        free(pHist->cdf[i]);
+
+        pHist->fragLen[i] = NULL;
+        pHist->cdf[i] = NULL;
+    }
+}
+
+static int CompareFragLenBin(const void* a, const void* b)
+{
+    const SR_FragLenBin* pBinOne = a;
+    const SR_FragLenBin* pBinTwo = b;
+
+   if (pBinOne->fragLen > pBinTwo->fragLen)
+       return 1;
+   else if (pBinOne->fragLen < pBinTwo->fragLen)
+       return -1;
+   else
+       return 0;
+}
+
+static void SR_FragLenHistToMature(SR_FragLenHist* pHist)
+{
+    for (unsigned int k = 0; k != NUM_ALLOWED_HIST; ++k)
+    {
+        const khash_t(fragLen)* pRawHist = pHist->rawHist[k];
+        if (pRawHist == NULL)
+            continue;
+
+        SR_FragLenBin* matureHist = (SR_FragLenBin*) malloc(kh_size(pRawHist) * sizeof(SR_FragLenBin));
+        if (matureHist == NULL)
+            SR_ErrQuit("ERROR: Not enough memory for the histogram in the fragment length distribution object.\n");
+
+        pHist->size[k] = kh_size(pRawHist);
+
+        unsigned int i = 0;
+        for (khiter_t khIter = kh_begin(pRawHist); khIter != kh_end(pRawHist); ++khIter)
+        {
+            if (kh_exist(pRawHist, khIter))
+            {
+                matureHist[i].fragLen = kh_key(pRawHist, khIter);
+                matureHist[i].freq = kh_value(pRawHist, khIter);
+                ++i;
+            }
+        }
+
+        qsort(matureHist, pHist->size[k], sizeof(SR_FragLenBin), CompareFragLenBin);
+
+        pHist->fragLen[k] = (uint32_t*) malloc(pHist->size[k] * sizeof(uint32_t));
+        if (pHist->fragLen == NULL)
+            SR_ErrQuit("ERROR: Not enough memory for the storeage of the fragment length array in the fragment length histogram.\n");
+
+        pHist->cdf[k] = (double*) malloc(pHist->size[k] * sizeof(double));
+        if (pHist->cdf == NULL)
+            SR_ErrQuit("ERROR: Not enough memory for the storeage of the cdf in the fragment length histogram.\n");
+
+        double cumFreq = 0.0;
+        double totalFragLen = 0.0;
+        uint64_t totalFreq = pHist->modeCount[k];
+        for (unsigned int j = 0; j != pHist->size[k]; ++j)
+        {
+            totalFragLen += matureHist[j].fragLen * matureHist[j].freq;
+            pHist->fragLen[k][j] = matureHist[j].fragLen;
+            cumFreq += matureHist[j].freq;
+            pHist->cdf[k][j] = cumFreq / totalFreq;
+        }
+
+        pHist->mean[k] = totalFragLen / totalFreq;
+
+        for (unsigned int j = 0; j != pHist->size[k]; ++j)
+        {
+            if (pHist->cdf[k][j] >= 0.5)
+            {
+                pHist->median[k] = pHist->fragLen[k][j];
+                break;
+            }
+        }
+
+        pHist->stdev[k] = 0.0;
+        for (unsigned int j = 0; j != pHist->size[k]; ++j)
+        {
+            pHist->stdev[k] += (double) matureHist[j].freq * pow(pHist->mean[k] - matureHist[j].fragLen, 2);
+        }
+
+        if (totalFreq != 1)
+            pHist->stdev[k] = sqrt(pHist->stdev[k] / (double) (totalFreq - 1));
+
+        free(matureHist);
+    }
+}
+
 
 
 
@@ -225,6 +234,7 @@ SR_FragLenDstrb* SR_FragLenDstrbAlloc(unsigned short minMQ, uint32_t capacity)
     pNewDstrb->pReadGrpHash = NULL;
     pNewDstrb->pHists = NULL;
 
+    pNewDstrb->numPairMode = 0;
     pNewDstrb->size = 0;
     pNewDstrb->capacity = capacity;
 
@@ -258,6 +268,69 @@ void SR_FragLenDstrbFree(SR_FragLenDstrb* pDstrb)
 
         free(pDstrb);
     }
+}
+
+SR_Status SR_FragLenDstrbSetPairMode(SR_FragLenDstrb* pDstrb, const char* cmdArg)
+{
+    for (unsigned int i = 0; i != NUM_TOTAL_PAIR_MODE; ++i)
+        pDstrb->validModeMap[i] = -1;
+
+    if (cmdArg == NULL)
+    {
+        pDstrb->numPairMode = 2;
+        pDstrb->validModeMap[1] = 0;
+        pDstrb->validModeMap[5] = 0;
+
+        return SR_OK;
+    }
+
+    unsigned int argLen = strlen(cmdArg);
+    if (argLen != 7 || argLen != 3)
+    {
+        SR_ErrMsg("ERROR: Invalid pair mode argument.(should be either 2 or 4 unique numbers between 1-8, separated by comma)");
+        return SR_ERR;
+    }
+
+    unsigned int pairModeSet = 0;
+    for (unsigned int i = 0; i < argLen; i += 2)
+    {
+        int pairMode = cmdArg[i] - '0';
+        ++(pDstrb->numPairMode);
+
+        if (pairMode < 1 || pairMode > 8)
+        {
+            SR_ErrMsg("ERROR: Invalid pair mode: %c\n", cmdArg[i]);
+            return SR_ERR;
+        }
+        else if (cmdArg[i + 1] != ',' && cmdArg[i + 1] != '\0')
+        {
+            SR_ErrMsg("ERROR: Invalid pair mode argument.(should be either 2 or 4 unique numbers between 1-8, separated by comma)");
+            return SR_ERR;
+        }
+        else if (pDstrb->validModeMap[pairMode] != -1)
+        {
+            SR_ErrMsg("ERROR: Pair mode number should be unique. Found %d twice\n", pairMode);
+            return SR_ERR;
+        }
+
+        if (pDstrb->numPairMode % 2 != 0)
+        {
+            pairModeSet = (pairMode << 3);
+        }
+        else
+        {
+            pairModeSet |= pairMode;
+            if (SR_PairModeSetMap[pairModeSet] == 0)
+            {
+                SR_ErrMsg("ERROR: Pair modes %d and %d are not compatible.\n", pairModeSet >> 3, pairModeSet & 7);
+                return SR_ERR;
+            }
+        }
+
+        pDstrb->validModeMap[pairMode] = (pDstrb->numPairMode - 1) / 2;
+    }
+
+    return SR_OK;
 }
 
 SR_Status SR_FragLenDstrbSetRG(SR_FragLenDstrb* pDstrb, const SR_BamHeader* pBamHeader)
@@ -335,14 +408,7 @@ SR_Status SR_FragLenDstrbSetRG(SR_FragLenDstrb* pDstrb, const SR_BamHeader* pBam
 
     pDstrb->pHists = (SR_FragLenHist*) calloc(pDstrb->size,  sizeof(SR_FragLenHist));
     if (pDstrb->pHists == NULL)
-        SR_ErrQuit("ERROR: Not enough memory for the storageof the histogram in the fragment length distribution object.\n");
-
-    // initialize the pair mode in each histogram
-    for (unsigned int i = 0; i != pDstrb->size; ++i)
-    {
-        for (unsigned int j = 0; j != NUM_PAIR_MODE; ++j)
-            pDstrb->pHists[i].modeCount[j].pairMode = j;
-    }
+        SR_ErrQuit("ERROR: Not enough memory for the storage of the histogram in the fragment length distribution object.\n");
 
     return SR_OK;
 }
@@ -369,7 +435,20 @@ SR_Status SR_FragLenDstrbUpdate(SR_FragLenDstrb* pDstrb, const SR_BamPairStats* 
     }
 
     SR_FragLenHist* pCurrHist = pDstrb->pHists + dstrbIndex;
-    khash_t(fragLen)* pCurrHash = pCurrHist->rawHist[pPairStats->pairMode];
+
+    // if the pair mode is not valid
+    // we only updated the count of the invalid pair and return
+    int8_t histIndex = pDstrb->validModeMap[pPairStats->pairMode];
+    if (histIndex < 0)
+    {
+        ++(pCurrHist->modeCount[INVALID_PAIR_MODE_SET_INDEX]);
+        return SR_OK;
+    }
+
+    // because we can have up to 2 different pair mode sets (4 differen pair modes)
+    // we should choose which histogram we should update
+    // the first one (with index 0 or 1) or the second one(2, 3)
+    khash_t(fragLen)* pCurrHash = pCurrHist->rawHist[histIndex];
 
     if (pCurrHash == NULL)
     {
@@ -388,9 +467,8 @@ SR_Status SR_FragLenDstrbUpdate(SR_FragLenDstrb* pDstrb, const SR_BamPairStats* 
         kh_value(pCurrHash, khIter) = 1;
     }
 
-    ++(pCurrHist->modeCount[pPairStats->pairMode].freq);
-    
-    pCurrHist->rawHist[pPairStats->pairMode] = pCurrHash;
+    ++(pCurrHist->modeCount[histIndex]);
+    pCurrHist->rawHist[histIndex] = pCurrHash;
 
     return SR_OK;
 }
@@ -399,14 +477,8 @@ void SR_FragLenDstrbFinalize(SR_FragLenDstrb* pDstrb)
 {
     for (unsigned int i = 0; i != pDstrb->size; ++i)
     {
-        SR_Status pairSetStatus = SR_FragLenHistSetMature(&(pDstrb->pHists[i]));
-
-        if (pairSetStatus == SR_ERR)
-        {
-            SR_ErrMsg("WARNING: Read group \"%s\" has incompatible pair mode set(%d and %d).\n"
-                      "         Fragment length histogram will not be calculated for this group.\n", 
-                       pDstrb->pReadGrpNames[i], pDstrb->pHists[i].modeCount[0].pairMode + 1, pDstrb->pHists[i].modeCount[1].pairMode + 1);
-        }
+        SR_FragLenHistToMature(&(pDstrb->pHists[i]));
+        SR_FragLenHistClearRaw(&(pDstrb->pHists[i]));
     }
 }
 

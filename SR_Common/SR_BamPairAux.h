@@ -30,6 +30,12 @@
 // Type and constant definition
 //===============================
 
+static const unsigned int SR_UNIQUE_ORPHAN_FMASK = (BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP);
+
+static const unsigned int SR_NORMAL_FMASK = (BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP | BAM_FUNMAP | BAM_FMUNMAP);
+
+static const unsigned int SR_SV_FMASK = (BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP | BAM_FUNMAP | BAM_FMUNMAP);
+
 // a map used to map the pair mode into its corresponding number
 // negative value means invalid mode
 static const int SR_PairModeMap[16] = { 
@@ -52,6 +58,17 @@ static const int SR_PairModeSetMap[64] =  { 0, 0, 0, 1, 0, 0, 0, 1,
                                             1, 0, 0, 0, 1, 0, 0, 0
                                           };
 
+
+typedef enum
+{
+    SR_UO_STREAM,
+
+    SR_NORMAL_STREAM,
+
+    SR_SV_STREAM
+
+}SR_StreamModeType;
+
 // the object used to hold the basic statistics of a pair of alignments
 typedef struct SR_BamPairStats
 {
@@ -67,6 +84,54 @@ typedef struct SR_BamPairStats
 //======================
 // Interface functions
 //======================
+
+static inline SR_Bool SR_UniqueOrphanFilter(const SR_BamNode* pBamNode, const void* filterData)
+{
+    if ((pBamNode->alignment.core.flag & BAM_FPAIRED) == 0
+        || strcmp(bam1_qname(&(pBamNode->alignment)), "*") == 0
+        || (pBamNode->alignment.core.flag & SR_UNIQUE_ORPHAN_FMASK) != 0)
+    {
+        return TRUE;
+    }
+    else
+    {
+        return FALSE;
+    }
+}
+
+static inline SR_Bool SR_NormalFilter(const SR_BamNode* pBamNode, const void* filterData)
+{
+    if ((pBamNode->alignment.core.flag & BAM_FPAIRED) == 0
+        || strcmp(bam1_qname(&(pBamNode->alignment)), "*") == 0
+        || (pBamNode->alignment.core.flag & SR_NORMAL_FMASK) != 0
+        || (pBamNode->alignment.core.isize == 0))
+    {
+        return TRUE;
+    }
+    else
+    {
+        return FALSE;
+    }
+}
+
+static inline void SR_SetStreamMode(SR_StreamMode* pStreamMode, SR_StreamModeType modeType)
+{
+    switch (modeType)
+    {
+        case SR_UO_STREAM:
+            pStreamMode->filterFunc = SR_UniqueOrphanFilter;
+            pStreamMode->controlFlag = SR_NO_SPECIAL_CONTROL;
+            break;
+        case SR_NORMAL_STREAM:
+            pStreamMode->filterFunc = SR_NormalFilter;
+            pStreamMode->controlFlag = SR_NO_SPECIAL_CONTROL;
+            break;
+        default:
+            fprintf(stderr, "ERROR: Invalid bam in stream mode.\n");
+            exit(1);
+            break;
+    }
+}
 
 //==================================================================
 // function:
@@ -114,7 +179,7 @@ SR_Status SR_LoadUniquOrphanPairs(SR_BamInStream* pBamInStream, unsigned int thr
 // return:
 //      the mode of the single read
 //==================================================================
-inline SR_SingleMode SR_BamGetSingleMode(bam1_t* pAlgn)
+static inline SR_SingleMode SR_BamGetSingleMode(const bam1_t* pAlgn)
 {
     if ((pAlgn->core.flag & BAM_FREAD1) != 0)
     {
@@ -161,9 +226,7 @@ inline SR_SingleMode SR_BamGetSingleMode(bam1_t* pAlgn)
 //=====================================================================
 inline SR_Bool SR_IsNormalPair(SR_BamNode** ppUpAlgn, SR_BamNode** ppDownAlgn, unsigned short minMQ)
 {
-    if (((*ppUpAlgn)->alignment.core.flag & BAM_FUNMAP) != 0
-        || ((*ppDownAlgn)->alignment.core.flag & BAM_FUNMAP) != 0
-        || (*ppUpAlgn)->alignment.core.qual < minMQ 
+    if ((*ppUpAlgn)->alignment.core.qual < minMQ 
         || (*ppDownAlgn)->alignment.core.qual < minMQ)
     {
         return FALSE;
