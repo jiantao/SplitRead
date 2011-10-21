@@ -21,10 +21,19 @@
 
 #include "khash.h"
 #include "SR_Error.h"
+#include "SR_Utilities.h"
 #include "SR_FragLenDstrb.h"
+
+
+//===============================
+// Type and constant definition
+//===============================
 
 // default capacity of fragment length distribution
 #define DEFAULT_FRAG_DSTRB_CAP 10
+
+// index of the mode count for invalid pair mode 
+#define INVALID_PAIR_MODE_SET_INDEX 2
 
 typedef struct SR_FragLenBin
 {
@@ -33,7 +42,6 @@ typedef struct SR_FragLenBin
     uint64_t freq;
 
 }SR_FragLenBin;
-
 
 // read group name hash
 KHASH_MAP_INIT_STR(readGrpName, uint32_t);
@@ -109,6 +117,10 @@ static SR_Status SR_FragLenHistSetMature(SR_FragLenHist* pHist)
 }
 */
 
+//===================
+// Static functions
+//===================
+
 static inline void SR_FragLenHistClearRaw(SR_FragLenHist* pHist)
 {
     for (unsigned int i = 0; i != NUM_ALLOWED_HIST; ++i)
@@ -132,7 +144,7 @@ static inline void SR_FragLenHistClear(SR_FragLenHist* pHist)
     }
 }
 
-static int CompareFragLenBin(const void* a, const void* b)
+static inline int CompareFragLenBin(const void* a, const void* b)
 {
     const SR_FragLenBin* pBinOne = a;
     const SR_FragLenBin* pBinTwo = b;
@@ -150,8 +162,9 @@ static void SR_FragLenHistToMature(SR_FragLenHist* pHist)
     for (unsigned int k = 0; k != NUM_ALLOWED_HIST; ++k)
     {
         const khash_t(fragLen)* pRawHist = pHist->rawHist[k];
+        // if we do not have the second pair mode, we will finish here
         if (pRawHist == NULL)
-            continue;
+            break;
 
         SR_FragLenBin* matureHist = (SR_FragLenBin*) malloc(kh_size(pRawHist) * sizeof(SR_FragLenBin));
         if (matureHist == NULL)
@@ -216,9 +229,11 @@ static void SR_FragLenHistToMature(SR_FragLenHist* pHist)
 }
 
 
+//===============================
+// Constructors and Destructors
+//===============================
 
-
-SR_FragLenDstrb* SR_FragLenDstrbAlloc(unsigned short minMQ, uint32_t capacity)
+SR_FragLenDstrb* SR_FragLenDstrbAlloc(uint32_t capacity)
 {
     SR_FragLenDstrb* pNewDstrb = (SR_FragLenDstrb*) calloc(1, sizeof(*pNewDstrb));
     if (pNewDstrb == NULL)
@@ -238,7 +253,6 @@ SR_FragLenDstrb* SR_FragLenDstrbAlloc(unsigned short minMQ, uint32_t capacity)
     pNewDstrb->size = 0;
     pNewDstrb->capacity = capacity;
 
-    pNewDstrb->minMQ = minMQ;
     pNewDstrb->hasRG = TRUE;
 
     return pNewDstrb;
@@ -270,6 +284,59 @@ void SR_FragLenDstrbFree(SR_FragLenDstrb* pDstrb)
     }
 }
 
+
+//======================
+// Interface functions
+//======================
+
+SR_PairMode SR_GetPairMode(const SR_BamNode* pBamNode)
+{
+    unsigned int upMode = 0;
+    unsigned int  downMode = 0;
+
+    if ((pBamNode->alignment.core.flag & BAM_FREVERSE) != 0)
+    {
+        upMode |= 1;
+    }
+
+    if ((pBamNode->alignment.core.flag & BAM_FMREVERSE) != 0)
+    {
+        downMode |= 1;
+    }
+
+    if ((pBamNode->alignment.core.flag & BAM_FREAD1) != 0 && (pBamNode->alignment.core.flag & BAM_FREAD2) != 0)
+        return SR_BAD_PAIR_MODE;
+    if ((pBamNode->alignment.core.flag & BAM_FREAD1) != 0)
+        downMode |= (1 << 1);
+    else if ((pBamNode->alignment.core.flag & BAM_FREAD2))
+        upMode |= (1 << 1);
+    else
+        return SR_BAD_PAIR_MODE;
+
+    if (pBamNode->alignment.core.isize < 0)
+        SR_SWAP(upMode, downMode, unsigned int);
+
+    return ((SR_PairMode) SR_PairModeMap[(upMode << 2) | downMode]);
+}
+
+SR_Status SR_LoadPairStats(SR_BamPairStats* pPairStats, const SR_BamNode* pBamNode)
+{
+    pPairStats->pairMode = SR_GetPairMode(pBamNode);
+    if (pPairStats->pairMode == SR_BAD_PAIR_MODE)
+        return SR_ERR;
+
+    pPairStats->fragLen = abs(pBamNode->alignment.core.isize);
+
+    static const char tagRG[2] = {'R', 'G'};
+    uint8_t* rgPos = bam_aux_get(&(pBamNode->alignment), tagRG);
+    if (rgPos != NULL)
+        pPairStats->RG = bam_aux2Z(rgPos);
+    else
+        pPairStats->RG = NULL;
+
+    return SR_OK;
+}
+
 SR_Status SR_FragLenDstrbSetPairMode(SR_FragLenDstrb* pDstrb, const char* cmdArg)
 {
     for (unsigned int i = 0; i != NUM_TOTAL_PAIR_MODE; ++i)
@@ -285,7 +352,7 @@ SR_Status SR_FragLenDstrbSetPairMode(SR_FragLenDstrb* pDstrb, const char* cmdArg
     }
 
     unsigned int argLen = strlen(cmdArg);
-    if (argLen != 7 || argLen != 3)
+    if (argLen != 3 && argLen != 7)
     {
         SR_ErrMsg("ERROR: Invalid pair mode argument.(should be either 2 or 4 unique numbers between 1-8, separated by comma)");
         return SR_ERR;
@@ -294,10 +361,10 @@ SR_Status SR_FragLenDstrbSetPairMode(SR_FragLenDstrb* pDstrb, const char* cmdArg
     unsigned int pairModeSet = 0;
     for (unsigned int i = 0; i < argLen; i += 2)
     {
-        int pairMode = cmdArg[i] - '0';
-        ++(pDstrb->numPairMode);
+        int pairMode = cmdArg[i] - '0' - 1;
+        pDstrb->validMode[(pDstrb->numPairMode)++] = pairMode;
 
-        if (pairMode < 1 || pairMode > 8)
+        if (pairMode < 0 || pairMode > 7)
         {
             SR_ErrMsg("ERROR: Invalid pair mode: %c\n", cmdArg[i]);
             return SR_ERR;
@@ -306,6 +373,7 @@ SR_Status SR_FragLenDstrbSetPairMode(SR_FragLenDstrb* pDstrb, const char* cmdArg
         {
             SR_ErrMsg("ERROR: Invalid pair mode argument.(should be either 2 or 4 unique numbers between 1-8, separated by comma)");
             return SR_ERR;
+
         }
         else if (pDstrb->validModeMap[pairMode] != -1)
         {
@@ -322,7 +390,7 @@ SR_Status SR_FragLenDstrbSetPairMode(SR_FragLenDstrb* pDstrb, const char* cmdArg
             pairModeSet |= pairMode;
             if (SR_PairModeSetMap[pairModeSet] == 0)
             {
-                SR_ErrMsg("ERROR: Pair modes %d and %d are not compatible.\n", pairModeSet >> 3, pairModeSet & 7);
+                SR_ErrMsg("ERROR: Pair modes %d and %d are not compatible.\n", (pairModeSet >> 3) + 1, (pairModeSet & 7) + 1);
                 return SR_ERR;
             }
         }
@@ -406,6 +474,7 @@ SR_Status SR_FragLenDstrbSetRG(SR_FragLenDstrb* pDstrb, const SR_BamHeader* pBam
         pDstrb->hasRG = FALSE;
     }
 
+    // allocate the memory for the histograms
     pDstrb->pHists = (SR_FragLenHist*) calloc(pDstrb->size,  sizeof(SR_FragLenHist));
     if (pDstrb->pHists == NULL)
         SR_ErrQuit("ERROR: Not enough memory for the storage of the histogram in the fragment length distribution object.\n");
@@ -413,26 +482,34 @@ SR_Status SR_FragLenDstrbSetRG(SR_FragLenDstrb* pDstrb, const SR_BamHeader* pBam
     return SR_OK;
 }
 
-SR_Status SR_FragLenDstrbUpdate(SR_FragLenDstrb* pDstrb, const SR_BamPairStats* pPairStats)
+SR_Status SR_FragLenDstrbGetRGIndex(int32_t* pReadGrpIndex, const SR_FragLenDstrb* pDstrb, const char* pReadGrpName)
 {
-    unsigned int dstrbIndex = 0;
+    *pReadGrpIndex = 0;
 
     if (pDstrb->hasRG)
     {
         khash_t(readGrpName)* pRgHash = pDstrb->pReadGrpHash;
-        khiter_t khIter = kh_get(readGrpName, pRgHash, pPairStats->RG);
+        khiter_t khIter = kh_get(readGrpName, pRgHash, pReadGrpName);
         if (khIter != kh_end(pRgHash))
         {
-            dstrbIndex = kh_value(pRgHash, khIter);
+            *pReadGrpIndex = kh_value(pRgHash, khIter);
         }
         else
         {
-            SR_ErrMsg("ERROR: Found a read group name that is not record in the header\n");
+            SR_ErrMsg("ERROR: Found a read group name that is not record in the header.\n");
             return SR_ERR;
         }
-
-        pDstrb->pReadGrpHash = pRgHash;
     }
+
+    return SR_OK;
+}
+
+SR_Status SR_FragLenDstrbUpdate(SR_FragLenDstrb* pDstrb, const SR_BamPairStats* pPairStats)
+{
+    int32_t dstrbIndex = 0;
+    SR_Status RGStatus = SR_FragLenDstrbGetRGIndex(&dstrbIndex, pDstrb, pPairStats->RG);
+    if (RGStatus == SR_ERR)
+        return SR_ERR;
 
     SR_FragLenHist* pCurrHist = pDstrb->pHists + dstrbIndex;
 
@@ -482,6 +559,33 @@ void SR_FragLenDstrbFinalize(SR_FragLenDstrb* pDstrb)
     }
 }
 
+void SR_DstrbCutoffSet(SR_FragLenDstrb* pDstrb, double cutoff)
+{
+    for (unsigned int i = 0; i != pDstrb->size; ++i)
+    {
+        for (unsigned int j = 0; j != NUM_ALLOWED_HIST; ++j)
+        {
+            for (unsigned int k = 0; k != pDstrb->pHists[i].size[j]; ++k)
+            {
+                if (pDstrb->pHists[i].cdf[j][k] >= cutoff)
+                {
+                    pDstrb->pHists[i].cutoff[j][DSTRB_LOWER_CUTOFF] = k;
+                    break;
+                }
+            }
+
+            for (int k = pDstrb->pHists[i].size[j] - 1; k != -1; --k)
+            {
+                if (pDstrb->pHists[i].cdf[j][k] <= 1 - cutoff)
+                {
+                    pDstrb->pHists[i].cutoff[j][DSTRB_UPPER_CUTOFF] = k;
+                    break;
+                }
+            }
+        }
+    }
+}
+
 void SR_FragLenDstrbWrite(const SR_FragLenDstrb* pDstrb, FILE* dstrbOutput)
 {
     size_t writeSize = 0;
@@ -492,6 +596,14 @@ void SR_FragLenDstrbWrite(const SR_FragLenDstrb* pDstrb, FILE* dstrbOutput)
     uint8_t rgFlag = pDstrb->hasRG;
     writeSize = fwrite(&(rgFlag), sizeof(uint8_t), 1, dstrbOutput);
     if (writeSize != 1)
+        SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
+
+    writeSize = fwrite(&(pDstrb->numPairMode), sizeof(uint8_t), 1, dstrbOutput);
+    if (writeSize != 1)
+        SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
+
+    writeSize = fwrite(pDstrb->validModeMap, sizeof(int8_t), NUM_TOTAL_PAIR_MODE, dstrbOutput);
+    if (writeSize != NUM_TOTAL_PAIR_MODE)
         SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
 
     if (pDstrb->hasRG)
@@ -513,70 +625,59 @@ void SR_FragLenDstrbWrite(const SR_FragLenDstrb* pDstrb, FILE* dstrbOutput)
         }
     }
 
-    for (unsigned int i = 0; i != pDstrb->size; ++i)
+    for (unsigned j = 0; j != pDstrb->numPairMode / 2; ++j)
     {
-        uint8_t pairMode = pDstrb->pHists[i].modeCount[0].pairMode;
-        writeSize = fwrite(&(pairMode), sizeof(uint8_t), 1, dstrbOutput);
-        if (writeSize != 1)
-            SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
+        for (unsigned int i = 0; i != pDstrb->size; ++i)
+        {
+            writeSize = fwrite(&(pDstrb->pHists[i].modeCount[j]), sizeof(uint64_t), 1, dstrbOutput);
+            if (writeSize != 1)
+                SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
+        }
 
-        pairMode = pDstrb->pHists[i].modeCount[1].pairMode;
-        writeSize = fwrite(&(pairMode), sizeof(uint8_t), 1, dstrbOutput);
-        if (writeSize != 1)
-            SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
-    }
+        for (unsigned int i = 0; i != pDstrb->size; ++i)
+        {
+            writeSize = fwrite(&(pDstrb->pHists[i].mean[j]), sizeof(double), 1, dstrbOutput);
+            if (writeSize != 1)
+                SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
+        }
 
-    for (unsigned int i = 0; i != pDstrb->size; ++i)
-    {
-        uint64_t histFreq = pDstrb->pHists[i].modeCount[0].freq + pDstrb->pHists[i].modeCount[1].freq;
-        writeSize = fwrite(&(histFreq), sizeof(uint64_t), 1, dstrbOutput);
-        if (writeSize != 1)
-            SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
-    }
+        for (unsigned int i = 0; i != pDstrb->size; ++i)
+        {
+            writeSize = fwrite(&(pDstrb->pHists[i].median[j]), sizeof(double), 1, dstrbOutput);
+            if (writeSize != 1)
+                SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
+        }
 
-    for (unsigned int i = 0; i != pDstrb->size; ++i)
-    {
-        writeSize = fwrite(&(pDstrb->pHists[i].mean), sizeof(double), 1, dstrbOutput);
-        if (writeSize != 1)
-            SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
-    }
+        for (unsigned int i = 0; i != pDstrb->size; ++i)
+        {
+            writeSize = fwrite(&(pDstrb->pHists[i].stdev[j]), sizeof(double), 1, dstrbOutput);
+            if (writeSize != 1)
+                SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
+        }
 
-    for (unsigned int i = 0; i != pDstrb->size; ++i)
-    {
-        writeSize = fwrite(&(pDstrb->pHists[i].median), sizeof(double), 1, dstrbOutput);
-        if (writeSize != 1)
-            SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
-    }
+        uint32_t startIndex = 0;
+        for (unsigned int i = 0; i != pDstrb->size + 1; ++i)
+        {
+            writeSize = fwrite(&(startIndex), sizeof(uint32_t), 1, dstrbOutput);
+            if (writeSize != 1)
+                SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
 
-    for (unsigned int i = 0; i != pDstrb->size; ++i)
-    {
-        writeSize = fwrite(&(pDstrb->pHists[i].stdev), sizeof(double), 1, dstrbOutput);
-        if (writeSize != 1)
-            SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
-    }
+            startIndex += pDstrb->pHists[i].size[j];
+        }
 
-    uint32_t startIndex = 0;
-    for (unsigned int i = 0; i != pDstrb->size + 1; ++i)
-    {
-        writeSize = fwrite(&(startIndex), sizeof(uint32_t), 1, dstrbOutput);
-        if (writeSize != 1)
-            SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
+        for (unsigned int i = 0; i != pDstrb->size; ++i)
+        {
+            writeSize = fwrite(pDstrb->pHists[i].fragLen[j], sizeof(uint32_t), pDstrb->pHists[i].size[j], dstrbOutput);
+            if (writeSize != pDstrb->pHists[i].size[j])
+                SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
+        }
 
-        startIndex += pDstrb->pHists[i].size;
-    }
-
-    for (unsigned int i = 0; i != pDstrb->size; ++i)
-    {
-        writeSize = fwrite(pDstrb->pHists[i].fragLen, sizeof(uint32_t), pDstrb->pHists[i].size, dstrbOutput);
-        if (writeSize != pDstrb->pHists[i].size)
-            SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
-    }
-
-    for (unsigned int i = 0; i != pDstrb->size; ++i)
-    {
-        writeSize = fwrite(pDstrb->pHists[i].cdf, sizeof(double), pDstrb->pHists[i].size, dstrbOutput);
-        if (writeSize != pDstrb->pHists[i].size)
-            SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
+        for (unsigned int i = 0; i != pDstrb->size; ++i)
+        {
+            writeSize = fwrite(pDstrb->pHists[i].cdf[j], sizeof(double), pDstrb->pHists[i].size[j], dstrbOutput);
+            if (writeSize != pDstrb->pHists[i].size[j])
+                SR_ErrQuit("ERROR: Found an error when writing into the fragment length distribution file.\n");
+        }
     }
 
     fflush(dstrbOutput);

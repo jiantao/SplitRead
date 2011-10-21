@@ -123,7 +123,8 @@ static void SR_BamInStreamReset(SR_BamInStream* pBamInStream)
 // Constructors and Destructors
 //===============================
 
-SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, unsigned int numThreads, unsigned int buffCapacity, unsigned int reportSize, const SR_StreamMode* pStreamMode)
+SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, unsigned int numThreads, unsigned int buffCapacity, 
+                                    unsigned int reportSize, const SR_StreamMode* pStreamMode)
 {
     SR_BamInStream* pBamInStream = (SR_BamInStream*) calloc(1, sizeof(SR_BamInStream));
     if (pBamInStream == NULL)
@@ -153,9 +154,17 @@ SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename, uint32_t binLen, un
         pBamInStream->pRetLists = (SR_BamList*) calloc(numThreads, sizeof(SR_BamList));
         if (pBamInStream->pRetLists == NULL)
             SR_ErrQuit("ERROR: Not enough memory for the storage of retrun alignment lists in the bam input stream object.\n");
+
+        pBamInStream->pAlgnTypes = (SR_AlgnType*) malloc(numThreads * reportSize * sizeof(SR_AlgnType));
+        if (pBamInStream->pAlgnTypes == NULL)
+            SR_ErrQuit("ERROR: Not enough memory for the storage of pair alignment type in the bam input stream object.\n");
     }
     else
+    {
         pBamInStream->pRetLists = NULL;
+        pBamInStream->pAlgnTypes = NULL;
+        pBamInStream->reportSize = 0;
+    }
 
     if ((pStreamMode->controlFlag & SR_PAIR_GENOMICALLY) == 0)
     {
@@ -184,6 +193,7 @@ void SR_BamInStreamFree(SR_BamInStream* pBamInStream)
         kh_destroy(queryName, pBamInStream->pNameHashes[CURR_BIN]);
 
         free(pBamInStream->pRetLists);
+        free(pBamInStream->pAlgnTypes);
         SR_BamMemPoolFree(pBamInStream->pMemPool);
 
         bam_close(pBamInStream->fpBamInput);
@@ -296,10 +306,10 @@ SR_BamHeader* SR_BamInStreamLoadHeader(SR_BamInStream* pBamInStream)
 }
 
 // load a unique-orphan pair from a bam file
-SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo, const void* filterData, SR_BamInStream* pBamInStream) 
+SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppUpAlgn, SR_BamNode** ppDownAlgn, SR_BamInStream* pBamInStream) 
 {
-    (*ppAlgnOne) = NULL;
-    (*ppAlgnTwo) = NULL;
+    (*ppUpAlgn) = NULL;
+    (*ppDownAlgn) = NULL;
 
     khash_t(queryName)* pNameHashPrev = pBamInStream->pNameHashes[PREV_BIN];
     khash_t(queryName)* pNameHashCurr = pBamInStream->pNameHashes[CURR_BIN];
@@ -309,7 +319,7 @@ SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo,
     {
         // exclude those reads who are non-paired-end, qc-fail, duplicate-marked, proper-paired, 
         // both aligned, secondary-alignment and no-name-specified.
-        SR_Bool shouldBeFiltered = pBamInStream->filterFunc(pBamInStream->pNewNode, filterData);
+        SR_Bool shouldBeFiltered = pBamInStream->filterFunc(pBamInStream->pNewNode, pBamInStream->filterData);
         if (shouldBeFiltered)
         {
             SR_BamNodeFree(pBamInStream->pNewNode, pBamInStream->pMemPool);
@@ -352,8 +362,8 @@ SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo,
 
         SR_BamListPushHead(&(pBamInStream->pAlgnLists[CURR_BIN]), pBamInStream->pNewNode);
 
-        (*ppAlgnOne) = NULL;
-        (*ppAlgnTwo) = NULL;
+        (*ppUpAlgn) = NULL;
+        (*ppDownAlgn) = NULL;
 
         khiter_t khIter = 0;
 
@@ -363,13 +373,13 @@ SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo,
         if (pNameHashPrev != NULL && khIter != kh_end(pNameHashPrev))
         {
             ret = SR_OK;
-            (*ppAlgnOne) = kh_value(pNameHashPrev, khIter);
-            (*ppAlgnTwo) = pBamInStream->pNewNode;
+            (*ppUpAlgn) = kh_value(pNameHashPrev, khIter);
+            (*ppDownAlgn) = pBamInStream->pNewNode;
 
             kh_del(queryName, pNameHashPrev, khIter);
 
-            SR_BamListRemove(&(pBamInStream->pAlgnLists[PREV_BIN]), (*ppAlgnOne));
-            SR_BamListRemove(&(pBamInStream->pAlgnLists[CURR_BIN]), (*ppAlgnTwo));
+            SR_BamListRemove(&(pBamInStream->pAlgnLists[PREV_BIN]), (*ppUpAlgn));
+            SR_BamListRemove(&(pBamInStream->pAlgnLists[CURR_BIN]), (*ppDownAlgn));
         }
         else
         {
@@ -379,13 +389,13 @@ SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo,
             if (khRet == 0) // we found a pair of alignments 
             {
                 ret = SR_OK;
-                (*ppAlgnOne) = kh_value(pNameHashCurr, khIter);
-                (*ppAlgnTwo) = pBamInStream->pNewNode;
+                (*ppUpAlgn) = kh_value(pNameHashCurr, khIter);
+                (*ppDownAlgn) = pBamInStream->pNewNode;
 
                 kh_del(queryName, pNameHashCurr, khIter);
 
-                SR_BamListRemove(&(pBamInStream->pAlgnLists[CURR_BIN]), (*ppAlgnOne));
-                SR_BamListRemove(&(pBamInStream->pAlgnLists[CURR_BIN]), (*ppAlgnTwo));
+                SR_BamListRemove(&(pBamInStream->pAlgnLists[CURR_BIN]), (*ppUpAlgn));
+                SR_BamListRemove(&(pBamInStream->pAlgnLists[CURR_BIN]), (*ppDownAlgn));
             }
             else // not finding corresponding mate, save the current value and move on
             {
