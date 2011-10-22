@@ -160,7 +160,7 @@ SR_PairMode SR_GetPairMode(const SR_BamNode* pBamNode);
 SR_Status SR_LoadPairStats(SR_BamPairStats* pPairStats, const SR_BamNode* pBamNode);
 
 
-SR_Status SR_FragLenDstrbSetPairMode(SR_FragLenDstrb* pDstrb, const char* cmdArg);
+void SR_FragLenDstrbSetPairMode(SR_FragLenDstrb* pDstrb, const int8_t* pValidPairMode, uint8_t numPairMode);
 
 //=======================================================================
 // function:
@@ -236,5 +236,14 @@ void SR_FragLenDstrbSetCutoff(SR_FragLenDstrb* pDstrb, double cutoff);
 //========================================================================
 void SR_FragLenDstrbWrite(const SR_FragLenDstrb* pDstrb, FILE* dstrbOutput);
 
+//=======================================================================
+// function:
+//      read the fragment length distribution from a file
+//
+// args:
+//      1. pDstrb: a pointer to a fragment length distribution object
+//      2. dstrbOutput: input stream
+//========================================================================
+void SR_FragLenDstrbRead(SR_FragLenDstrb* pDstrb, FILE* dstrbInput);
 
 #endif  /*SR_FRAGLENDSTRB_H*/
