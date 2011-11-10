@@ -327,6 +327,12 @@ void HashRegionTableLoad(HashRegionTable* pRegionTable, const SR_InHashTable* pH
         prevQueryPos = currQueryPos;
         ++currQueryPos;
     }
+
+    for (unsigned int i = 0; i != pRegionTable->pBestCloseRegions->size; ++i)
+    {
+        pRegionTable->pBestCloseRegions->data[i].queryBegin = i;
+        pRegionTable->pBestFarRegions->data[i].queryBegin = i;
+    }
 }
 
 // index the best hash regions with their end position

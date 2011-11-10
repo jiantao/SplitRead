@@ -21,6 +21,8 @@
 
 #include "SR_FragLenDstrb.h"
 
+#define SR_NUM_SV_TYPES 6
+
 typedef enum
 {
     SV_UNKNOWN            = 0,
@@ -29,27 +31,24 @@ typedef enum
 
     SV_INSERTION          = 2,
 
-    SV_MEI_INSERTION      = 4,
+    SV_INVERSION          = 3,
 
-    SV_TANDEM_DUP         = 8,
+    SV_TANDEM_DUP         = 4,
 
-    SV_INVERSION          = 16,
+    SV_INTER_CHR_TRNSLCTN = 5,
 
-    SV_INTRA_CHR_TRNSLCTN = 32,
-
-    SV_INTER_CHR_TRNSLCTN = 64
+    SV_MEI_INSERTION      = 6
 
 }SV_EventType;
 
 typedef struct SR_ReadPairInfo
 {
     int32_t readGrpID;
-
-    int32_t upRefID;
+    int32_t downRefID;
 
     union
     {
-        int32_t dowRefID;
+        int32_t upRefID;
         int32_t fragLen;
     };
 
@@ -71,19 +70,20 @@ typedef struct SR_ReadPairInfoArray
 
 }SR_ReadPairInfoArray;
 
-SR_Bool SR_ReadPairFilter(SR_BamNode* pBamNode, const void* filterData);
-
-static inline SR_Bool SR_IsSVPair(SR_BamNode** ppUpAlgn, SR_BamNode** ppDownAlgn, unsigned short minMQ)
+typedef struct SR_ReadPairInfoTable
 {
-    if ((*ppUpAlgn)->alignment.core.qual < minMQ 
-        || (*ppDownAlgn)->alignment.core.qual < minMQ)
-    {
-        return FALSE;
-    }
+    SR_ReadPairInfoArray arrays[SR_NUM_SV_TYPES];
 
-    return TRUE;
-}
+    uint32_t* chrIndex;
+    
+    uint32_t numChr;
 
-SR_Status SR_ReadPairInfoLoad(SR_ReadPairInfo* pInfo, const SR_BamNode* pUpAlgn, const SR_BamNode* pDownAlgn, const SR_FragLenDstrb* pDstrb);
+}SR_ReadPairInfoTable;
+
+SR_ReadPairInfoTable* SR_ReadPairInfoTableAlloc(unsigned int numChr);
+
+void SR_ReadPairInfoTableFree(SR_ReadPairInfoTable* pInfoTable);
+
+SR_Status SR_ReadPairInfoTableLoad(SR_ReadPairInfoTable* pInfoTable, const SR_BamNode* pUpAlgn, const SR_BamNode* pDownAlgn, const SR_FragLenDstrb* pDstrb);
 
 #endif  /*SR_READPAIRDETECTOR_H*/

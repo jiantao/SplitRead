@@ -18,10 +18,11 @@
 
 #include <math.h>
 
+#include "SR_Utilities.h"
 #include "SR_Error.h"
 #include "SR_ReadPairDetector.h"
 
-static const unsigned int SR_READ_PAIR_FMASK = (BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP | BAM_FUNMAP | BAM_FMUNMAP);
+#define SR_DEFAULT_RP_CAPACITY 50
 
 static const SV_EventType SV_EventTypeMap[8][8] = 
 {
@@ -78,82 +79,61 @@ static void SR_ReadPairLoadProb(SR_ReadPairInfo* pInfo, const SR_FragLenDstrb* p
     pInfo->probNum = 1;
 }
 
-SR_Bool SR_ReadPairFilter(SR_BamNode* pBamNode, const void* filterData)
+SR_ReadPairInfoTable* SR_ReadPairInfoTableAlloc(unsigned int numChr)
 {
-    if ((pBamNode->alignment.core.flag & BAM_FPAIRED) == 0
-        || strcmp(bam1_qname(&(pBamNode->alignment)), "*") == 0
-        || (pBamNode->alignment.core.flag & SR_READ_PAIR_FMASK) != 0
-        || (pBamNode->alignment.core.isize == 0))
+    SR_ReadPairInfoTable* pNewInfoTable = (SR_ReadPairInfoTable*) malloc(sizeof(SR_ReadPairInfoTable));
+    if (pNewInfoTable == NULL)
+        SR_ErrQuit("ERROR: Not enough memory for read pair information table.\n");
+
+    for (unsigned int i = 0; i != SR_NUM_SV_TYPES; ++i)
     {
-        return TRUE;
+        SR_ARRAY_INIT(&(pNewInfoTable->arrays[i]), SR_DEFAULT_RP_CAPACITY, SR_ReadPairInfo);
     }
 
-    // get the statistics of the read pair
-    SR_BamPairStats pairStats;
-    SR_Status status = SR_BamPairStatsLoad(&pairStats, pBamNode);
-    if (status == SR_ERR)
-        return TRUE;
+    pNewInfoTable->numChr = numChr;
+    pNewInfoTable->chrIndex = (uint32_t*) calloc(SR_NUM_SV_TYPES * numChr, sizeof(uint32_t));
+    if (pNewInfoTable->chrIndex == NULL)
+        SR_ErrQuit("ERROR: Not enough memory for the storage of chromosome index in the read pair information table.\n");
 
-    // this is the fragment length distribution
-    const SR_FragLenDstrb* pDstrb = (const SR_FragLenDstrb*) filterData;
-
-    // any reads do not have valid read group name will be filtered out
-    int32_t readGrpIndex = 0;
-    status = SR_FragLenDstrbGetRGIndex(&readGrpIndex, pDstrb, pairStats.RG);
-    if (status == SR_ERR)
-        return TRUE;
-    
-    // any reads aligned to different chromosome will be kept as SV candidates
-    if (pBamNode->alignment.core.tid != pBamNode->alignment.core.mtid)
-    {
-        return FALSE;
-    }
-
-    // any reads aligned with improper pair mode (orientation) will be kept as SV candidates
-    int histIndex = pDstrb->validModeMap[pairStats.pairMode];
-    if (histIndex < 0)
-    {
-        return FALSE;
-    }
-
-    // any reads with fragment length at the edge of the fragment length distribution will be kept as SV candidates
-    uint32_t lowerCutoffIndex = pDstrb->pHists[readGrpIndex].cutoff[histIndex][DSTRB_LOWER_CUTOFF];
-    uint32_t upperCutoffIndex = pDstrb->pHists[readGrpIndex].cutoff[histIndex][DSTRB_UPPER_CUTOFF];
-
-    uint32_t lowerCutoff = pDstrb->pHists[readGrpIndex].fragLen[histIndex][lowerCutoffIndex];
-    uint32_t upperCutoff = pDstrb->pHists[readGrpIndex].fragLen[histIndex][upperCutoffIndex];
-
-    if (pairStats.fragLen < lowerCutoff || pairStats.fragLen > upperCutoff)
-        return FALSE;
-
-    // at last, those reads with valid pair mode and proper fragment length will be filtered out
-    return TRUE;
+    return pNewInfoTable;
 }
 
-SR_Status SR_ReadPairInfoLoad(SR_ReadPairInfo* pInfo, const SR_BamNode* pUpAlgn, const SR_BamNode* pDownAlgn, const SR_FragLenDstrb* pDstrb)
+void SR_ReadPairInfoTableFree(SR_ReadPairInfoTable* pInfoTable)
 {
-    pInfo->upPos = pUpAlgn->alignment.core.pos;
-    pInfo->downPos = pDownAlgn->alignment.core.pos;
+    if (pInfoTable != NULL)
+    {
+        free(pInfoTable->chrIndex);
+        free(pInfoTable);
+    }
+}
+
+
+SR_Status SR_ReadPairInfoTableLoad(SR_ReadPairInfoTable* pInfoTable, const SR_BamNode* pUpAlgn, const SR_BamNode* pDownAlgn, const SR_FragLenDstrb* pDstrb)
+{
+    SR_ReadPairInfo info;
+
+    info.upPos = pUpAlgn->alignment.core.pos;
+    info.downPos = pDownAlgn->alignment.core.pos;
 
     // get the statistics of the read pair
     SR_BamPairStats pairStats;
-    SR_BamPairStatsLoad(&pairStats, pUpAlgn);
+    SR_LoadPairStats(&pairStats, pUpAlgn);
 
-    pInfo->pairMode = pairStats.pairMode;
-    SR_FragLenDstrbGetRGIndex(&(pInfo->readGrpID), pDstrb, pairStats.RG);
+    info.pairMode = pairStats.pairMode;
+    SR_FragLenDstrbGetRGIndex(&(info.readGrpID), pDstrb, pairStats.RG);
 
-    pInfo->eventType = SV_UNKNOWN;
-    pInfo->probNum = 0;
-    pInfo->probPower = 0;
+    info.eventType = SV_UNKNOWN;
+    info.probNum = 0;
+    info.probPower = 0;
 
-    pInfo->upRefID = pUpAlgn->alignment.core.tid;
+    info.downRefID = pUpAlgn->alignment.core.tid;
 
     if (pUpAlgn->alignment.core.tid == pDownAlgn->alignment.core.tid)
-        pInfo->fragLen = abs(pUpAlgn->alignment.core.isize);
+        info.fragLen = abs(pUpAlgn->alignment.core.isize);
     else
     {
-        pInfo->dowRefID = -(pDownAlgn->alignment.core.tid);
-        pInfo->eventType |= SV_INTER_CHR_TRNSLCTN;
+        info.upRefID = -(pUpAlgn->alignment.core.tid);
+        info.eventType = SV_INTER_CHR_TRNSLCTN;
         return SR_OK;
     }
 
@@ -167,46 +147,49 @@ SR_Status SR_ReadPairInfoLoad(SR_ReadPairInfo* pInfo, const SR_BamNode* pUpAlgn,
 
             if ((eventFirst == SV_UNKNOWN && eventSecond == SV_UNKNOWN) || (eventFirst != SV_UNKNOWN && eventSecond != SV_UNKNOWN))
             {
-                pInfo->eventType = SV_UNKNOWN;
+                info.eventType = SV_UNKNOWN;
             }
             else if (eventFirst != SV_UNKNOWN)
             {
-                pInfo->eventType |= eventFirst;
+                info.eventType = eventFirst;
             }
             else
             {
-                pInfo->eventType |= eventSecond;
+                info.eventType = eventSecond;
             }
-        }
-        else
-        {
-            pInfo->eventType = SV_UNKNOWN;
         }
     }
     else
     {
         // any reads with fragment length at the edge of the fragment length distribution will be kept as SV candidates
-        uint32_t lowerCutoffIndex = pDstrb->pHists[pInfo->readGrpID].cutoff[histIndex][DSTRB_LOWER_CUTOFF];
-        uint32_t upperCutoffIndex = pDstrb->pHists[pInfo->readGrpID].cutoff[histIndex][DSTRB_UPPER_CUTOFF];
+        uint32_t lowerCutoffIndex = pDstrb->pHists[info.readGrpID].cutoff[histIndex][DSTRB_LOWER_CUTOFF];
+        uint32_t upperCutoffIndex = pDstrb->pHists[info.readGrpID].cutoff[histIndex][DSTRB_UPPER_CUTOFF];
 
-        uint32_t lowerCutoff = pDstrb->pHists[pInfo->readGrpID].fragLen[histIndex][lowerCutoffIndex];
-        uint32_t upperCutoff = pDstrb->pHists[pInfo->readGrpID].fragLen[histIndex][upperCutoffIndex];
+        uint32_t lowerCutoff = pDstrb->pHists[info.readGrpID].fragLen[histIndex][lowerCutoffIndex];
+        uint32_t upperCutoff = pDstrb->pHists[info.readGrpID].fragLen[histIndex][upperCutoffIndex];
 
         if (pairStats.fragLen < lowerCutoff)
         {
-            SR_ReadPairLoadProb(pInfo, pDstrb, 0, lowerCutoffIndex);
-            pInfo->eventType |= SV_INSERTION;
+            SR_ReadPairLoadProb(&info, pDstrb, 0, lowerCutoffIndex);
+            info.eventType = SV_INSERTION;
         }
         else if (pairStats.fragLen > upperCutoff)
         {
-            SR_ReadPairLoadProb(pInfo, pDstrb, upperCutoffIndex, pDstrb->pHists[pInfo->readGrpID].size[histIndex] - 1);
-            pInfo->eventType |= SV_DELETION;
-        }
-        else
-        {
-            return SR_ERR;
+            SR_ReadPairLoadProb(&info, pDstrb, upperCutoffIndex, pDstrb->pHists[info.readGrpID].size[histIndex] - 1);
+            info.eventType = SV_DELETION;
         }
     }
+
+    if (info.eventType != SV_UNKNOWN)
+    {
+        SR_ReadPairInfoArray* pInfoArray = &(pInfoTable->arrays[info.eventType - 1]);
+        SR_ARRAY_PUSH(pInfoArray, &info, SR_ReadPairInfo);
+
+        unsigned int index = (info.eventType - 1) * pInfoTable->numChr + info.downRefID;
+        ++(pInfoTable->chrIndex[index]);
+    }
+    else
+        return SR_NOT_FOUND;
 
     return SR_OK;
 }
