@@ -78,6 +78,15 @@ static void ResetBestRegions(HashRegionTable* pRegionTable, unsigned short query
 
     (pRegionTable->pBestCloseRegions)->size = queryLen;
     (pRegionTable->pBestFarRegions)->size = queryLen;
+
+    for (unsigned int i = 0; i != queryLen; ++i)
+    {
+        BestRegion* tempRegion = pRegionTable->pBestCloseRegions->data + i;
+        tempRegion->length = 0;
+
+        tempRegion = pRegionTable->pBestFarRegions->data + i;
+        tempRegion->length = 0;
+    }
 }
 
 
@@ -326,12 +335,6 @@ void HashRegionTableLoad(HashRegionTable* pRegionTable, const SR_InHashTable* pH
         // move to the next hash position in query
         prevQueryPos = currQueryPos;
         ++currQueryPos;
-    }
-
-    for (unsigned int i = 0; i != pRegionTable->pBestCloseRegions->size; ++i)
-    {
-        pRegionTable->pBestCloseRegions->data[i].queryBegin = i;
-        pRegionTable->pBestFarRegions->data[i].queryBegin = i;
     }
 }
 

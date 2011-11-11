@@ -45,9 +45,11 @@ static void SR_ReadPairLoadProb(SR_ReadPairInfo* pInfo, const SR_FragLenDstrb* p
     unsigned int min = begin;
     unsigned int max = end;
 
+
     while (min <= max)
     {
         unsigned int mid = (min + max) / 2;
+
         if (pInfo->fragLen == fragLenArray[mid])
         {
             double prob = begin == 0 ? probArray[mid] : (1 - probArray[mid]);
@@ -61,6 +63,8 @@ static void SR_ReadPairLoadProb(SR_ReadPairInfo* pInfo, const SR_FragLenDstrb* p
                 pInfo->probPower = -ceil(log10(prob));
                 pInfo->probNum = (int32_t) prob * pow(10, pInfo->probPower);
             }
+
+            return;
         }
         else if (pInfo->fragLen > fragLenArray[mid])
         {
@@ -179,6 +183,7 @@ SR_Status SR_ReadPairInfoTableLoad(SR_ReadPairInfoTable* pInfoTable, const SR_Ba
             info.eventType = SV_DELETION;
         }
     }
+
 
     if (info.eventType != SV_UNKNOWN)
     {
