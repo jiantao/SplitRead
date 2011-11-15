@@ -130,7 +130,7 @@ SR_Status SR_ReadPairInfoTableLoad(SR_ReadPairInfoTable* pInfoTable, const SR_Ba
     info.probNum = 0;
     info.probPower = 0;
 
-    info.downRefID = pUpAlgn->alignment.core.tid;
+    info.downRefID = pDownAlgn->alignment.core.tid;
 
     if (pUpAlgn->alignment.core.tid == pDownAlgn->alignment.core.tid)
         info.fragLen = abs(pUpAlgn->alignment.core.isize);

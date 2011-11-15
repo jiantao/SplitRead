@@ -83,9 +83,11 @@ static void ResetBestRegions(HashRegionTable* pRegionTable, unsigned short query
     {
         BestRegion* tempRegion = pRegionTable->pBestCloseRegions->data + i;
         tempRegion->length = 0;
+        tempRegion->numPos = 0;
 
         tempRegion = pRegionTable->pBestFarRegions->data + i;
         tempRegion->length = 0;
+        tempRegion->numPos = 0;
     }
 }
 
