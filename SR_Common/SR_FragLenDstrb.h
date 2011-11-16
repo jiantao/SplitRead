@@ -67,7 +67,7 @@ typedef struct SR_BamPairStats
 
     unsigned int fragLen;     // fragment length of the pair
 
-    uint16_t pairMode;        // orientation mode of the pair
+    int16_t pairMode;        // orientation mode of the pair
 
 }SR_BamPairStats;
 
