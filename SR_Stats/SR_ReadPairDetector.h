@@ -78,12 +78,34 @@ typedef struct SR_ReadPairInfoTable
     
     uint32_t numChr;
 
+    uint32_t numRG;
+
+    uint32_t* detectBound;             // cutoff of the probability
+
+    uint32_t* clusterBound;
+
+    double* medianFragLen;
+
+    double detectCutoff;
+
+    double clusterCutoff;
+
 }SR_ReadPairInfoTable;
 
-SR_ReadPairInfoTable* SR_ReadPairInfoTableAlloc(unsigned int numChr);
+SR_ReadPairInfoTable* SR_ReadPairInfoTableAlloc(uint32_t numChr, uint32_t numRG, double detectCutoff, double clusterCutoff);
 
 void SR_ReadPairInfoTableFree(SR_ReadPairInfoTable* pInfoTable);
 
-SR_Status SR_ReadPairInfoTableLoad(SR_ReadPairInfoTable* pInfoTable, const SR_BamNode* pUpAlgn, const SR_BamNode* pDownAlgn, const SR_FragLenDstrb* pDstrb);
+//=======================================================================
+// function:
+//      set the probability cutoff for all the histograms
+//
+// args:
+//      1. pDstrb: a pointer to a fragment length distribution object
+//      2. cutoff: the fragment length probability cutoff
+//========================================================================
+void SR_ReadPairInfoTableSetCutOff(SR_ReadPairInfoTable* pInfoTable, SR_FragLenDstrb* pDstrb);
+
+SR_Status SR_ReadPairInfoTableUpdate(SR_ReadPairInfoTable* pInfoTable, const SR_BamNode* pUpAlgn, const SR_BamNode* pDownAlgn, const SR_FragLenDstrb* pDstrb);
 
 #endif  /*SR_READPAIRDETECTOR_H*/

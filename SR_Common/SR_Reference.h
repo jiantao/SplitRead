@@ -30,6 +30,12 @@
 // Type and constant definition
 //===============================
 
+// the default number of chromosomes
+#define DEFAULT_NUM_CHR 100
+
+// the default number of special reference
+#define DEFAULT_NUM_SPECIAL_REF 30
+
 // reset the reference object for next reading
 #define SR_ReferenceReset(pRef)               \
     do                                        \
@@ -38,6 +44,15 @@
                                               \
     }while(0) 
 
+typedef struct SR_SpecialRefInfo
+{
+    uint32_t* endPos;
+
+    uint32_t numRefs;
+
+    uint32_t capacity;
+
+}SR_SpecialRefInfo;
 
 // reference header strcture
 typedef struct SR_RefHeader
@@ -53,6 +68,12 @@ typedef struct SR_RefHeader
     int64_t* htFilePos;       // an array contains the file offset poisition of each chromosomes in the hash table file
 
     uint32_t numRefs;         // total number of chromosomes 
+
+    uint32_t numSeqs;         // total number of reference sequences (special reference sequence may contain one or more chromosomes)
+
+    uint32_t capacity;
+
+    SR_SpecialRefInfo* pSpecialRefInfo;
 
 }SR_RefHeader;
 
@@ -85,9 +106,13 @@ SR_Reference* SR_ReferenceAlloc(void);
 // free an existing reference object
 void SR_ReferenceFree(SR_Reference* pRef);
 
-SR_RefHeader* SR_RefHeaderAlloc(void);
+SR_RefHeader* SR_RefHeaderAlloc(uint32_t refCapacity, uint32_t seqCapacity);
 
 void SR_RefHeaderFree(SR_RefHeader* pRefHeader);
+
+SR_SpecialRefInfo* SR_SpecialRefInfoAlloc(uint32_t capcity);
+
+void SR_SpecialRefInfoFree(SR_SpecialRefInfo* pSpecialRefInfo);
 
 
 //==========================================
@@ -107,7 +132,7 @@ void SR_RefHeaderFree(SR_RefHeader* pRefHeader);
 //      reference file. It is used to check the compatibility between
 //      the reference file and the hash table file
 //====================================================================
-int64_t SR_RefHeaderRead(SR_RefHeader* pRefHeader, FILE* refInput);
+SR_RefHeader* SR_RefHeaderRead(FILE* refInput);
 
 //===================================================================
 // function:
@@ -170,6 +195,11 @@ void SR_ReferenceRead(SR_Reference* pRef, FILE* refInput);
 //      SR_ERR: find an error during loading
 //===================================================================
 SR_Status SR_ReferenceLoad(SR_Reference* pRef, SR_RefHeader* pRefHeader, FILE* faInput);
+
+
+uint32_t SR_SpecialRefGetBeginPos(SR_RefHeader* pRefHeader, uint32_t specialRefID);
+
+SR_Status SR_SpecialRefLoad(SR_Reference* pRef, SR_RefHeader* pRefHeader, FILE* faInput);
 
 //===================================================================
 // function:

@@ -23,7 +23,7 @@
 #include "SR_Build_GetOpt.h"
 
 // total number of arguments we should expect for the split-read build program
-#define OPT_BUILD_TOTAL_NUM 5
+#define OPT_BUILD_TOTAL_NUM 6
 
 // total number of required arguments we should expect for the split-read build program
 #define OPT_BUILD_REQUIRED_NUM 4
@@ -42,6 +42,8 @@
 
 // the index of the hash size in the option object array
 #define OPT_HASH_SIZE       4
+
+#define OPT_SPECIAL_REF_INPUT 5
 
 
 // get the options from command line arguemnts
@@ -99,6 +101,7 @@ void SR_Build_SetPars(SR_Build_Pars* pars, int argc, char* argv[])
         {"ro",   NULL, FALSE},
         {"hto",  NULL, FALSE},
         {"hs",   NULL, FALSE},
+        {"sfi",  NULL, FALSE},
         {NULL,   NULL, FALSE}
     };
 
@@ -148,6 +151,17 @@ void SR_Build_SetPars(SR_Build_Pars* pars, int argc, char* argv[])
                     SR_ErrQuit("ERROR: Invalid hash size. Hash size should be greater than zero and less than %d.\n", MAX_HASH_SIZE);
 
                 break;
+            case OPT_SPECIAL_REF_INPUT:
+                if (opts[i].isFound)
+                {
+                    pars->specialRefInput = fopen(opts[i].value, "r");
+                    if (pars->specialRefInput == NULL)
+                        SR_ErrSys("ERROR: Cannot open special reference fasta file \"%s\" for reading.\n", opts[i].value);
+                }
+                else
+                    pars->specialRefInput = NULL;
+
+                break;
             default:
                 SR_ErrQuit("ERROR: Unrecognized argument.\n");
                 break;
@@ -161,13 +175,14 @@ void SR_Build_SetPars(SR_Build_Pars* pars, int argc, char* argv[])
 // show the help message and quit
 void SR_Build_ShowHelp(void)
 {
-    printf("Usage: SR_Build -fi <input_fasta_file> -ro <reference_output_file> -hto <hash_table_output_file> -hs <hash_size>\n");
+    printf("Usage: SR_Build -fi <input_fasta_file> -ro <reference_output_file> -hto <hash_table_output_file> -hs <hash_size> [-sfi special_fasta_file]\n");
     printf("Read in the reference file in fasta file and ouput the SR format reference file and hash table file.\n\n");
 
     printf("-fi       input reference file in fasta format\n");
     printf("-ro       output reference file in \"SR\" format\n");
     printf("-hto      output hash table file.\n");
     printf("-hs       hash size parameter(1 - %d)\n", MAX_HASH_SIZE);
+    printf("-sfi      input special reference file in fast format (optional)\n");
     printf("-help     display help message and exit\n\n");
 
     exit(EXIT_SUCCESS);
@@ -183,4 +198,7 @@ void SR_Build_Clean(SR_Reference* reference, SR_RefHeader* refHeader, SR_OutHash
     fclose(buildPars->faInput);
     fclose(buildPars->refOutput);
     fclose(buildPars->hashTableOutput);
+
+    if (buildPars->specialRefInput != NULL)
+        fclose(buildPars->specialRefInput);
 }

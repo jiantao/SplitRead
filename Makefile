@@ -1,7 +1,8 @@
 $(shell mkdir -p ../obj)
 $(shell mkdir -p ../bin)
 
-export ECHO=/bin/echo
+export SHELL=/bin/bash
+export ECHO=echo
 export SRC_DIR := $(shell pwd)
 export OBJ_DIR := $(subst src,obj,$(SRC_DIR))
 export BIN_DIR := $(subst src,bin,$(SRC_DIR))
@@ -9,7 +10,7 @@ export COMMON_DIR := $(SRC_DIR)/SR_Common
 export INCLUDES := -I$(COMMON_DIR)
 
 export CC = gcc
-export CFLAGS = -Wall -O3 -std=gnu99
+export CFLAGS = -Wall -g -std=gnu99
 
 VPATH := $(SRC_DIR)/SR_Build:$(SRC_DIR)/SR_Common
 

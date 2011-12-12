@@ -56,7 +56,6 @@ typedef struct SR_OutHashTable
 
 
 
-
 SR_HashPosArray* SR_HashPosArrayAlloc(unsigned int capacity);
 
 void SR_HashPosArrayInit(SR_HashPosArray* hashPosArray, unsigned int capacity);

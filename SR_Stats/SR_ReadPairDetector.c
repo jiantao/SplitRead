@@ -83,7 +83,7 @@ static void SR_ReadPairLoadProb(SR_ReadPairInfo* pInfo, const SR_FragLenDstrb* p
     pInfo->probNum = 1;
 }
 
-SR_ReadPairInfoTable* SR_ReadPairInfoTableAlloc(unsigned int numChr)
+SR_ReadPairInfoTable* SR_ReadPairInfoTableAlloc(uint32_t numChr, uint32_t numRG, double detectCutoff, double clusterCutoff)
 {
     SR_ReadPairInfoTable* pNewInfoTable = (SR_ReadPairInfoTable*) malloc(sizeof(SR_ReadPairInfoTable));
     if (pNewInfoTable == NULL)
@@ -99,6 +99,21 @@ SR_ReadPairInfoTable* SR_ReadPairInfoTableAlloc(unsigned int numChr)
     if (pNewInfoTable->chrIndex == NULL)
         SR_ErrQuit("ERROR: Not enough memory for the storage of chromosome index in the read pair information table.\n");
 
+    pNewInfoTable->numRG = numRG;
+    pNewInfoTable->detectBound = (uint32_t*) calloc(numRG * NUM_ALLOWED_HIST * 2, sizeof(uint32_t));
+    if (pNewInfoTable->detectBound == NULL)
+        SR_ErrQuit("ERROR: Not enough memory for the storage of detection boundaries in the read pair information table.\n");
+
+    pNewInfoTable->clusterBound = (uint32_t*) calloc(numRG * NUM_ALLOWED_HIST * 2, sizeof(uint32_t));
+    if (pNewInfoTable->clusterBound == NULL)
+        SR_ErrQuit("ERROR: Not enough memory for the storage of cluster range in the read pair information table.\n");
+
+    if (detectCutoff >= clusterCutoff)
+        SR_ErrMsg("WARNING: The probablity of detection cutoff is too large(%f).\n", detectCutoff);
+
+    pNewInfoTable->detectCutoff = detectCutoff;
+    pNewInfoTable->clusterCutoff = clusterCutoff;
+
     return pNewInfoTable;
 }
 
@@ -107,12 +122,65 @@ void SR_ReadPairInfoTableFree(SR_ReadPairInfoTable* pInfoTable)
     if (pInfoTable != NULL)
     {
         free(pInfoTable->chrIndex);
+        free(pInfoTable->detectBound);
+        free(pInfoTable->clusterBound);
         free(pInfoTable);
     }
 }
 
+void SR_ReadPairInfoTableSetCutOff(SR_ReadPairInfoTable* pInfoTable, SR_FragLenDstrb* pDstrb)
+{
+    SR_Bool foundDownDetectCutoff = FALSE;
+    SR_Bool foundUpDetectCutoff = FALSE;
+    SR_Bool foundDownClusterCutoff = FALSE;
+    SR_Bool foundUpClusterCutoff = FALSE;
 
-SR_Status SR_ReadPairInfoTableLoad(SR_ReadPairInfoTable* pInfoTable, const SR_BamNode* pUpAlgn, const SR_BamNode* pDownAlgn, const SR_FragLenDstrb* pDstrb)
+    for (unsigned int i = 0; i != pDstrb->size; ++i)
+    {
+        for (unsigned int j = 0; j != NUM_ALLOWED_HIST; ++j)
+        {
+            unsigned index = i * NUM_ALLOWED_HIST * 2;
+            for (unsigned int k = 0; k != pDstrb->pHists[i].size[j]; ++k)
+            {
+                if (pDstrb->pHists[i].cdf[j][k] >= pInfoTable->detectCutoff && !foundDownDetectCutoff)
+                {
+                    pInfoTable->detectBound[index] = k;
+                    foundDownDetectCutoff = TRUE;
+                }
+
+                if (pDstrb->pHists[i].cdf[j][k] >= pInfoTable->clusterCutoff && !foundDownClusterCutoff)
+                {
+                    pInfoTable->clusterBound[index] = pDstrb->pHists[i].fragLen[j][k];
+                    foundDownClusterCutoff = TRUE;
+                }
+
+                if (foundDownClusterCutoff && foundDownDetectCutoff)
+                    break;
+            }
+
+            for (int k = pDstrb->pHists[i].size[j] - 1; k != -1; --k)
+            {
+                if (pDstrb->pHists[i].cdf[j][k] <= 1 -  pInfoTable->detectCutoff && !foundUpDetectCutoff)
+                {
+                    pInfoTable->detectBound[index + 1] = k;
+                    foundUpDetectCutoff = TRUE;
+                }
+
+                if (pDstrb->pHists[i].cdf[j][k] <= 1 - pInfoTable->clusterCutoff && !foundUpClusterCutoff)
+                {
+                    pInfoTable->clusterBound[index + 1] = pDstrb->pHists[i].fragLen[j][k];
+                    foundUpClusterCutoff = TRUE;
+                }
+
+                if (foundUpClusterCutoff && foundUpDetectCutoff)
+                    break;
+            }
+        }
+    }
+}
+
+
+SR_Status SR_ReadPairInfoTableUpdate(SR_ReadPairInfoTable* pInfoTable, const SR_BamNode* pUpAlgn, const SR_BamNode* pDownAlgn, const SR_FragLenDstrb* pDstrb)
 {
     SR_ReadPairInfo info;
 

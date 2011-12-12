@@ -40,11 +40,11 @@ int main(int argc, char *argv[])
 
     // create the reference object and the reference hash table object
     SR_Reference* reference = SR_ReferenceAlloc();
-    SR_RefHeader* refHeader = SR_RefHeaderAlloc();
+    SR_RefHeader* refHeader = SR_RefHeaderAlloc(DEFAULT_NUM_CHR, DEFAULT_NUM_CHR);
     SR_OutHashTable* refHashTable = SR_OutHashTableAlloc(buildPars.hashSize);
 
     // a indicator of the end of the input reference file
-    SR_Status status = SR_ERR;
+    SR_Status status = SR_EOF;
 
     // read the reference sequence from the fasta file chromosome by chromosome and store it in the reference object
     // index the referen sequence with the user-specified hash size and store the hash positions in the hash position file
@@ -88,6 +88,25 @@ int main(int argc, char *argv[])
 
     }while(status == SR_OK);
 
+    // handle the special references
+    if (buildPars.specialRefInput != NULL)
+    {
+        refHeader->pSpecialRefInfo = SR_SpecialRefInfoAlloc(DEFAULT_NUM_SPECIAL_REF);
+
+        // load the special references
+        SR_SpecialRefLoad(reference, refHeader, buildPars.specialRefInput);
+
+        // index every possible hash position in the current chromosome
+        // and write the results into hash position index file and hash position file
+        SR_OutHashTableLoad(refHashTable, reference->sequence, reference->seqLen, reference->id);
+        int64_t htFileOffset = SR_OutHashTableWrite(refHashTable, buildPars.hashTableOutput);
+
+        // write the reference sequence of current chromosome into the reference output file
+        int64_t refFileOffset = SR_ReferenceWrite(reference, buildPars.refOutput);
+
+        refHeader->refFilePos[refHeader->numSeqs - 1] = refFileOffset;
+        refHeader->htFilePos[refHeader->numSeqs - 1] = htFileOffset;
+    }
     
     int64_t refHeaderPos = SR_RefHeaderWrite(refHeader, buildPars.refOutput);
     SR_ReferenceSetStart(refHeaderPos, buildPars.refOutput);

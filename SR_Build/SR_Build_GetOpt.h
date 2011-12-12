@@ -45,6 +45,8 @@ typedef struct SR_Build_Pars
 
     FILE* hashTableOutput;    // output stream of the hash table file
 
+    FILE* specialRefInput;    // input stream of the special reference fasta file
+
     unsigned char hashSize;   // hash size used to index the reference
 
 }SR_Build_Pars;
