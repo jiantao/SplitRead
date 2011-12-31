@@ -39,13 +39,6 @@
 // load into the object without any reallocation.
 #define DEFAULT_REF_CAP 300000000
 
-#define DEFAULT_SPECIAL_REF_CAP 30000
-
-#define DEFAULT_PADDING_LEN 300
-
-// the default start chromosome ID
-#define DEFAULT_START_CHR 1
-
 // initialize the hash table for reference name
 KHASH_MAP_INIT_STR(refName, int32_t);
 
@@ -104,7 +97,8 @@ static void SR_RefHeaderSetName(SR_RefHeader* pRefHeader, const char* buff)
         if (pRefHeader->names == NULL)
             SR_ErrQuit("ERROR: Not enough memory for the reference name.\n");
 
-        pRefHeader->md5s = (char*) realloc(pRefHeader->md5s, pRefHeader->capacity * MD5_STR_LEN * sizeof(char));
+        // we need to allocate one more character for the trailing null character from sprintf
+        pRefHeader->md5s = (char*) realloc(pRefHeader->md5s, (pRefHeader->capacity * MD5_STR_LEN + 1) * sizeof(char));
         if (pRefHeader->md5s == NULL)
             SR_ErrQuit("ERROR: Not enough memory for MD5 strings in a reference header object.\n");
 
@@ -210,7 +204,8 @@ SR_RefHeader* SR_RefHeaderAlloc(uint32_t refCapacity, uint32_t seqCapacity)
 
     pRefHeader->dict = (void*) kh_init(refName);
 
-    pRefHeader->md5s = (char*) calloc(refCapacity * MD5_STR_LEN, sizeof(char));
+    // we need to allocate one more character for the trailing null character from sprintf
+    pRefHeader->md5s = (char*) calloc((refCapacity * MD5_STR_LEN + 1), sizeof(char));
     if (pRefHeader->md5s == NULL)
         SR_ErrQuit("ERROR: Not enough memory for MD5 strings in a reference header object.\n");
 
@@ -279,26 +274,38 @@ void SR_SpecialRefInfoFree(SR_SpecialRefInfo* pSpecialRefInfo)
     }
 }
 
+SR_RefView* SR_RefViewAlloc(void)
+{
+    SR_RefView* pRefView = (SR_RefView*) calloc(1, sizeof(SR_RefView));
+    if (pRefView == NULL)
+        SR_ErrQuit("Not enough memory for a reference view object.\n");
+
+    return pRefView;
+}
+
+void SR_RefViewFree(SR_RefView* pRefView)
+{
+    free(pRefView);
+}
 
 //==========================================
 // Interface functions related with input
 //==========================================
 
 // read the reference header from the reference file
-SR_RefHeader* SR_RefHeaderRead(FILE* refInput)
+SR_RefHeader* SR_RefHeaderRead(int64_t* pRefHeaderPos, FILE* refInput)
 {
     size_t readSize = 0;
-    int64_t refHeaderPos = 0;
-    int64_t refStart = 0;
+    int64_t refPos = 0;
 
-    readSize = fread(&refHeaderPos, sizeof(int64_t), 1, refInput);
+    readSize = fread(pRefHeaderPos, sizeof(int64_t), 1, refInput);
     if (readSize != 1)
         SR_ErrQuit("ERROR: Cannot read the reference header position from the reference file.\n");
 
-    if ((refStart = ftello(refInput)) < 0)
+    if ((refPos = ftello(refInput)) < 0)
         SR_ErrQuit("ERROR: Cannot get the offset of current file.\n");
 
-    if (fseeko(refInput, refHeaderPos, SEEK_SET) != 0)
+    if (fseeko(refInput, *pRefHeaderPos, SEEK_SET) != 0)
         SR_ErrQuit("ERROR: Cannot seek in the reference file.\n");
 
     uint32_t numRefs = 0;
@@ -373,7 +380,7 @@ SR_RefHeader* SR_RefHeaderRead(FILE* refInput)
     if (readSize != pRefHeader->numSeqs)
         SR_ErrQuit("ERROR: Cannot read the offset of hash table from the reference file.\n");
 
-    if (fseeko(refInput, refStart, SEEK_SET) != 0)
+    if (fseeko(refInput, refPos, SEEK_SET) != 0)
         SR_ErrQuit("ERROR: Cannot seek in the reference file.\n");
 
     return pRefHeader;
@@ -389,10 +396,37 @@ int32_t SR_RefHeaderGetRefID(const SR_RefHeader* pRefHeader, const char* refName
     return iter == kh_end(hash)? -1 : kh_value(hash, iter);
 }
 
+SR_Status SR_SpecialRefRead(SR_Reference* pSpecialRef, const SR_RefHeader* pRefHeader, FILE* refInput)
+{
+    if (pRefHeader->pSpecialRefInfo != NULL)
+    {
+        int64_t refPos = ftello(refInput);
+        if (refPos < 0)
+            SR_ErrQuit("ERROR: Cannot get the offset of current file.\n");
+
+        int64_t specialRefPos = pRefHeader->refFilePos[pRefHeader->numSeqs - 1];
+        if (fseeko(refInput, specialRefPos, SEEK_SET) != 0)
+            SR_ErrQuit("ERROR: Cannot seek in the reference file.\n");
+
+        SR_ReferenceRead(pSpecialRef, refInput);
+
+        if (fseeko(refInput, refPos, SEEK_SET) != 0)
+            SR_ErrQuit("ERROR: Cannot seek in the reference file.\n");
+
+        return SR_OK;
+    }
+
+    return SR_ERR;
+}
+
 // jump to a certain chromosome given the reference ID
 SR_Status SR_ReferenceJump(FILE* refInput, const SR_RefHeader* pRefHeader, int32_t refID)
 {
-    int64_t jumpPos = pRefHeader->refFilePos[refID];
+    if (refID < 0)
+        return SR_ERR;
+
+    int32_t seqID = SR_RefHeaderGetSeqID(pRefHeader, refID);
+    int64_t jumpPos = pRefHeader->refFilePos[seqID];
 
     if (fseeko(refInput, jumpPos, SEEK_SET) != 0)
         return SR_ERR;
@@ -426,6 +460,43 @@ void SR_ReferenceRead(SR_Reference* pRef, FILE* refInput)
     readSize = fread(pRef->sequence, sizeof(char), pRef->seqLen, refInput);
     if (readSize != pRef->seqLen)
         SR_ErrQuit("ERROR: Cannot read chromosome sequence from the reference file.\n");
+}
+
+
+SR_Status SR_GetRefFromSpecialPos(SR_RefView* pRefView, int32_t* pRefID, uint32_t* pPos, const SR_RefHeader* pRefHeader, const SR_Reference* pSpecialRef, uint32_t specialPos)
+{
+    if (pRefHeader->pSpecialRefInfo != NULL)
+    {
+        if (specialPos <= pRefHeader->pSpecialRefInfo->endPos[0])
+        {
+            *pRefID = pRefHeader->numSeqs - 1;
+            *pPos    = specialPos;
+
+            pRefView->id = *pRefID;
+            pRefView->sequence = pSpecialRef->sequence;
+            pRefView->seqLen = pRefHeader->pSpecialRefInfo->endPos[0] + 1;
+
+            return SR_OK;
+        }
+
+        for (unsigned int i = 0; i != pRefHeader->pSpecialRefInfo->numRefs - 1; ++i)
+        {
+            unsigned int beginPos = pRefHeader->pSpecialRefInfo->endPos[i] + DEFAULT_PADDING_LEN + 1;
+            if (specialPos >= beginPos && specialPos <= pRefHeader->pSpecialRefInfo->endPos[i + 1])
+            {
+                *pRefID = pRefHeader->numSeqs + i;
+                *pPos    = specialPos - beginPos;
+
+                pRefView->id = *pRefID;
+                pRefView->sequence = pSpecialRef->sequence + beginPos;
+                pRefView->seqLen = pRefHeader->pSpecialRefInfo->endPos[i + 1] - beginPos + 1;
+
+                return SR_OK;
+            }
+        }
+    }
+
+    return SR_ERR;
 }
 
 
@@ -488,11 +559,6 @@ SR_Status SR_ReferenceLoad(SR_Reference* pRef, SR_RefHeader* pRefHeader, FILE* f
     return SR_OK;
 }
 
-uint32_t SR_SpecialRefGetBeginPos(SR_RefHeader* pRefHeader, uint32_t specialRefID)
-{
-    return (specialRefID == 0 ? 0 : pRefHeader->pSpecialRefInfo->endPos[specialRefID - 1] + DEFAULT_PADDING_LEN + 1);
-}
-
 SR_Status SR_SpecialRefLoad(SR_Reference* pRef, SR_RefHeader* pRefHeader, FILE* faInput)
 {
     char buff[MAX_REF_LINE];
@@ -540,7 +606,15 @@ SR_Status SR_SpecialRefLoad(SR_Reference* pRef, SR_RefHeader* pRefHeader, FILE* 
                     pRef->seqCap = (pRef->seqLen + DEFAULT_PADDING_LEN) * 2;
                     pRef->sequence = (char*) realloc(pRef->sequence, sizeof(char) * pRef->seqCap);
                     if (pRef->sequence == NULL) 
-                        SR_ErrQuit("ERROR: Not enough memory for the storage of sequence in the pRef object.\n");
+                        SR_ErrQuit("ERROR: Not enough memory for the storage of sequence in the reference object.\n");
+                }
+
+                if (pSpecialRefInfo->numRefs == pSpecialRefInfo->capacity)
+                {
+                    pSpecialRefInfo->capacity *= 2;
+                    pSpecialRefInfo->endPos = (uint32_t*) realloc(pSpecialRefInfo->endPos, pSpecialRefInfo->capacity * sizeof(uint32_t));
+                    if (pSpecialRefInfo->endPos == NULL)
+                        SR_ErrQuit("ERROR: Not enough memory for the storage of the end positions in the special reference object.\n");
                 }
 
                 pSpecialRefInfo->endPos[pSpecialRefInfo->numRefs] = pRef->seqLen - 1;
