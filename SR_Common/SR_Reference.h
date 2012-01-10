@@ -33,6 +33,8 @@
 // the default number of chromosomes
 #define DEFAULT_NUM_CHR 100
 
+#define DEFAULT_NUM_SPECIAL_REF 30
+
 // the default length of padding between two special references
 #define DEFAULT_PADDING_LEN 300
 

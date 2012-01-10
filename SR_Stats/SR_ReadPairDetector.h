@@ -31,30 +31,31 @@ typedef enum
 
     SV_INSERTION          = 2,
 
-    SV_INVERSION          = 3,
+    SV_TANDEM_DUP         = 3,
 
-    SV_TANDEM_DUP         = 4,
+    SV_INVERSION3         = 4,
 
-    SV_INTER_CHR_TRNSLCTN = 5,
+    SV_INVERSION5         = 5,
 
-    SV_MEI_INSERTION      = 6
+    SV_INTER_CHR_TRNSLCTN = 6,
+
+    SV_MEI_ALU            = 7
 
 }SV_EventType;
 
 typedef struct SR_ReadPairInfo
 {
     int32_t readGrpID;
+
     int32_t downRefID;
 
-    union
-    {
-        int32_t upRefID;
-        int32_t fragLen;
-    };
+    int32_t upRefID;
+
+    int32_t downPos;
 
     int32_t upPos;
 
-    int32_t downPos;
+    int32_t fragLen;
 
     int32_t probPower:8, probNum:8, eventType:8, pairMode:8;
 
@@ -70,6 +71,36 @@ typedef struct SR_ReadPairInfoArray
 
 }SR_ReadPairInfoArray;
 
+typedef struct SR_ReadPairAttrbt
+{
+    double firstAttribute;
+
+    double secondAttribute;
+
+    uint32_t origIdex;
+
+    int32_t readGrpID;
+
+}SR_ReadPairAttrbt;
+
+typedef struct SR_ReadPairAttrbtArray
+{
+    SV_EventType eventType;
+
+    SR_ReadPairAttrbt* data;
+
+    uint32_t dataSize;
+
+    uint32_t dataCap;
+
+    double* bound;
+
+    uint32_t boundSize;
+
+    uint32_t boundCap;
+
+}SR_ReadPairAttrbtArray;
+
 typedef struct SR_ReadPairInfoTable
 {
     SR_ReadPairInfoArray arrays[SR_NUM_SV_TYPES];
@@ -80,21 +111,15 @@ typedef struct SR_ReadPairInfoTable
 
     uint32_t numRG;
 
-    uint32_t* detectBound;             // cutoff of the probability
-
-    uint32_t* clusterBound;
-
-    double* medianFragLen;
-
-    double detectCutoff;
-
-    double clusterCutoff;
-
 }SR_ReadPairInfoTable;
 
-SR_ReadPairInfoTable* SR_ReadPairInfoTableAlloc(uint32_t numChr, uint32_t numRG, double detectCutoff, double clusterCutoff);
+SR_ReadPairInfoTable* SR_ReadPairInfoTableAlloc(uint32_t numChr, uint32_t numRG, double cutoff);
 
 void SR_ReadPairInfoTableFree(SR_ReadPairInfoTable* pInfoTable);
+
+SR_ReadPairAttrbtArray* SR_ReadPairAttrbtArrayAlloc(uint32_t dataCap, uint32_t boundCap);
+
+void SR_ReadPairAttrbtArrayFree(SR_ReadPairAttrbtArray* pAttrbtArray);
 
 //=======================================================================
 // function:
@@ -104,8 +129,12 @@ void SR_ReadPairInfoTableFree(SR_ReadPairInfoTable* pInfoTable);
 //      1. pDstrb: a pointer to a fragment length distribution object
 //      2. cutoff: the fragment length probability cutoff
 //========================================================================
-void SR_ReadPairInfoTableSetCutOff(SR_ReadPairInfoTable* pInfoTable, SR_FragLenDstrb* pDstrb);
+void SR_ReadPairInfoTableSetCutOff(SR_ReadPairInfoTable* pInfoTable, const SR_FragLenDstrb* pDstrb);
 
 SR_Status SR_ReadPairInfoTableUpdate(SR_ReadPairInfoTable* pInfoTable, const SR_BamNode* pUpAlgn, const SR_BamNode* pDownAlgn, const SR_FragLenDstrb* pDstrb);
+
+void SR_ReadPairAttrbtArrayResize(SR_ReadPairAttrbtArray* pAttrbtArray, uint32_t newDataCap, uint32_t newBoundCap);
+
+void SR_ReadPairMake(SR_ReadPairAttrbtArray* pAttrbtArray, const SR_FragLenDstrb* pDstrb, const SR_ReadPairInfoArray* pInfoArray, SV_EventType eventType);
 
 #endif  /*SR_READPAIRDETECTOR_H*/
