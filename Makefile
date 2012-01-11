@@ -2,7 +2,7 @@ $(shell mkdir -p ../obj)
 $(shell mkdir -p ../bin)
 
 export SHELL=/bin/bash
-export ECHO=echo
+export ECHO=/bin/echo
 export SRC_DIR := $(shell pwd)
 export OBJ_DIR := $(subst src,obj,$(SRC_DIR))
 export BIN_DIR := $(subst src,bin,$(SRC_DIR))

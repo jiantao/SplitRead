@@ -10,4 +10,4 @@ $(DEPENDANTS): $(SOURCES)
 
 %.d: %.c
 	@$(CC) -MM $(CFLAGS) $(INCLUDES) $< > $(OBJ_DIR)/$@; \
-	$(ECHO) "\t@$(CC) $(CFLAGS) $(INCLUDES) -c $(CURR_DIR)/$< -o $(OBJ_DIR)/$(*F).o\n" >> $(OBJ_DIR)/$@
+	$(ECHO) -e "\t@$(CC) $(CFLAGS) $(INCLUDES) -c $(CURR_DIR)/$< -o $(OBJ_DIR)/$(*F).o\n" >> $(OBJ_DIR)/$@
