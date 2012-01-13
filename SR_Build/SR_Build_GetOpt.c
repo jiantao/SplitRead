@@ -175,7 +175,7 @@ void SR_Build_SetPars(SR_Build_Pars* pars, int argc, char* argv[])
 // show the help message and quit
 void SR_Build_ShowHelp(void)
 {
-    printf("Usage: SR_Build -fi <input_fasta_file> -ro <reference_output_file> -hto <hash_table_output_file> -hs <hash_size> [-sfi special_fasta_file]\n");
+    printf("Usage: SR_Build -fi <input_fasta_file> -ro <reference_output_file> -hto <hash_table_output_file> -hs <hash_size> -sfi [special_fasta_file]\n");
     printf("Read in the reference file in fasta file and ouput the SR format reference file and hash table file.\n\n");
 
     printf("-fi       input reference file in fasta format\n");
