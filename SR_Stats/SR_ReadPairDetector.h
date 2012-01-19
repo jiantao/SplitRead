@@ -113,6 +113,10 @@ typedef struct SR_ReadPairInfoTable
 
 }SR_ReadPairInfoTable;
 
+#define SR_ReadPairAttrbtArrayGetFirstBound(pAttrbArray, i) ((pAttrbArray)->bound[ 2 * (pAttrbArray)->data[(i)].readGrpID])
+
+#define SR_ReadPairAttrbtArrayGetSecondBound(pAttrbArray, i) ((pAttrbArray)->bound[ 2 * (pAttrbArray)->data[(i)].readGrpID + 1])
+
 SR_ReadPairInfoTable* SR_ReadPairInfoTableAlloc(uint32_t numChr, uint32_t numRG, double cutoff);
 
 void SR_ReadPairInfoTableFree(SR_ReadPairInfoTable* pInfoTable);
