@@ -85,13 +85,28 @@
             (pArray)->capacity *= 2;                                                                          \
             (pArray)->data = (dataType*) realloc((pArray)->data, sizeof(dataType) * (pArray)->capacity);      \
             if ((pArray)->data == NULL)                                                                       \
-                SR_ErrSys("ERROR: not enough memory to expand the storage->\n");                              \
+                SR_ErrSys("ERROR: not enough memory to expand the storage of data in an array.\n");           \
         }                                                                                                     \
                                                                                                               \
         SR_ARRAY_GET(pArray, (pArray)->size) = *(pNewElt);                                                    \
         ++((pArray)->size);                                                                                   \
                                                                                                               \
     }while(0)
+
+#define SR_ARRAY_RESIZE(pArray, newCapacity, dataType)                                                        \
+    do                                                                                                        \
+    {                                                                                                         \
+        if ((newCapacity) > (pArray)->capacity)                                                               \
+        {                                                                                                     \
+            (pArray)->capacity = newCapacity;                                                                 \
+            (pArray)->data = (dataType*) realloc((pArray)->data, sizeof(dataType) * (pArray)->capacity);      \
+            if ((pArray)->data == NULL)                                                                       \
+                SR_ErrSys("ERROR: not enough memory to expand the storage of data in an array.\n");           \
+                                                                                                              \
+        }                                                                                                     \
+                                                                                                              \
+    }while(0)
+
 
 #define SR_ARRAY_POP(pArray)   \
     do                         \
@@ -124,6 +139,7 @@
     }while(0)
 
 
+#define SR_ARRAY_IS_FULL(pArray) ((pArray)->size == (pArray)->capacity)
 
 
 #endif  /*SR_UTILITIES_H*/
