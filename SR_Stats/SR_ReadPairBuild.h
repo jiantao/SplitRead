@@ -190,8 +190,6 @@ void SR_ReadPairTableFree(SR_ReadPairTable* pInfoTable);
 
 void SR_ReadPairBuild(const SR_ReadPairBuildPars* pBuildPars);
 
-void SR_ReadPairBuildTest(const SR_ReadPairBuildPars* pBuildPars);
-
 void SR_ReadPairTableClear(SR_ReadPairTable* pReadPairTable);
 
 void SR_ReadPairTableUpdate(SR_ReadPairTable* pReadPairTable, const bam1_t* pUpAlgn, const bam1_t* pDownAlgn, const SR_ZAtag* pZAtag,

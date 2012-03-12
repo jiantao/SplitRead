@@ -458,7 +458,7 @@ void SR_ReadPairTableFree(SR_ReadPairTable* pReadPairTable)
     }
 }
 
-void SR_ReadPairBuildTest(const SR_ReadPairBuildPars* pBuildPars)
+void SR_ReadPairBuild(const SR_ReadPairBuildPars* pBuildPars)
 {
     // some default capacity of the containers
     unsigned int buffCapacity = 100;
