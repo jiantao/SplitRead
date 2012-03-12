@@ -63,7 +63,7 @@ struct SR_BamBuff
 
 struct SR_BamMemPool
 {
-    unsigned short numBuffs;
+    unsigned int numBuffs;
 
     unsigned int buffCapacity;
 

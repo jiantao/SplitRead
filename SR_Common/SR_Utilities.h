@@ -19,6 +19,12 @@
 #ifndef  SR_UTILITIES_H
 #define  SR_UTILITIES_H
 
+#include <math.h>
+#include <ctype.h>
+#include <stdio.h>
+
+#include "SR_Types.h"
+
 
 #define SR_TO_STRING_PRE(obj) #obj
 
@@ -98,7 +104,7 @@
     {                                                                                                         \
         if ((newCapacity) > (pArray)->capacity)                                                               \
         {                                                                                                     \
-            (pArray)->capacity = newCapacity;                                                                 \
+            (pArray)->capacity = (newCapacity);                                                               \
             (pArray)->data = (dataType*) realloc((pArray)->data, sizeof(dataType) * (pArray)->capacity);      \
             if ((pArray)->data == NULL)                                                                       \
                 SR_ErrSys("ERROR: not enough memory to expand the storage of data in an array.\n");           \
@@ -107,6 +113,22 @@
                                                                                                               \
     }while(0)
 
+#define SR_ARRAY_RESIZE_NO_COPY(pArray, newCapacity, dataType)                                                \
+    do                                                                                                        \
+    {                                                                                                         \
+        if ((newCapacity) > (pArray)->capacity)                                                               \
+        {                                                                                                     \
+            free(pArray->data);                                                                               \
+            (pArray)->capacity = newCapacity;                                                                 \
+            (pArray)->data = (dataType*) calloc(sizeof(dataType), (pArray)->capacity);                        \
+            if ((pArray)->data == NULL)                                                                       \
+                SR_ErrSys("ERROR: not enough memory to expand the storage of data in an array.\n");           \
+                                                                                                              \
+        }                                                                                                     \
+                                                                                                              \
+        (pArray)->size = 0;                                                                                   \
+                                                                                                              \
+    }while(0)
 
 #define SR_ARRAY_POP(pArray)   \
     do                         \
@@ -116,12 +138,7 @@
     }while(0)
 
 
-#define SR_ARRAY_RESET(pArray)       \
-    do                               \
-    {                                \
-        (pArray)->size = SR_EMPTY;   \
-                                     \
-    }while(0)
+#define SR_ARRAY_RESET(pArray) (pArray)->size = SR_EMPTY
 
 
 #define SR_ARRAY_FREE(pArray, freeObj)   \
@@ -140,6 +157,29 @@
 
 
 #define SR_ARRAY_IS_FULL(pArray) ((pArray)->size == (pArray)->capacity)
+
+int FindKthSmallestInt(int array[], int size, int k);
+
+int FindMedianInt(int array[], int size);
+
+unsigned int FindKthSmallestUint(unsigned int array[], unsigned int size, unsigned int k);
+
+unsigned int FindMedianUint(unsigned int array[], unsigned int size);
+
+static inline int DoubleRoundToInt(double number)
+{
+    return ((int) floor(number + 0.5));
+}
+
+static inline void StrToUpper(char* str)
+{
+    for (unsigned int i = 0; str[i] != '\0'; ++i)
+        str[i] = toupper(str[i]);
+}
+
+char* SR_CreateFileName(const char* workingDir, const char* fileName);
+
+SR_Status SR_GetNextLine(char* buff, unsigned int buffSize, FILE* input);
 
 
 #endif  /*SR_UTILITIES_H*/

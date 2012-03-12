@@ -21,7 +21,6 @@
 #include "bam.h"
 #include "SR_Types.h"
 #include "SR_BamHeader.h"
-#include "SR_BamMemPool.h"
 // #include "SR_BamPairAux.h"
 
 //===============================
@@ -30,18 +29,7 @@
 
 #define SR_IsValidPairMode(pDstrb, pairMode) ((pDstrb)->validModeMap & (1 << (pairMode)))
 
-#define SR_GetHistCutoffIndex(pDstrb, readGrpID, where) ((pDstrb)->pHists[(readGrpID)].cutoff[(where)])
-
-#define SR_GetHistCutoffValue(pDstrb, readGrpID, cutoffIndex) ((pDstrb)->pHists[(readGrpID)].fragLen[(cutoffIndex)])
-
 #define SR_GetHistMedian(pDstrb, readGrpID) ((pDstrb)->pHists[(readGrpID)].median)
-
-enum SR_FragLenDstrbCutoffIndex
-{
-    DSTRB_LOWER_CUTOFF = 0,
-
-    DSTRB_UPPER_CUTOFF = 1
-};
 
 // a map used to map the pair mode into its corresponding number
 // negative value means invalid mode
@@ -66,6 +54,17 @@ static const int SR_PairModeSetMap[64] =  {
                                                0, 0, 1, 0, 0, 1, 0, 0,
                                                1, 0, 0, 0, 1, 0, 0, 0
                                           };
+typedef enum
+{
+    ST_ILLUMINA = 0,
+
+    ST_454 = 1,
+
+    ST_SOLID = 2,
+
+    ST_ILLUMINA_LONG = 3
+
+}SR_SeqTech;
 
 
 // the object used to hold the basic statistics of a pair of alignments
@@ -86,7 +85,7 @@ typedef struct SR_FragLenHist
 
     uint32_t* fragLen;              // array of the fragment length
 
-    double* cdf;                    // array of the cumulative probability at a given fragment length
+    uint32_t* freq;                 // frequency of each fragment length
 
     double mean;                    // mean of the histogram
 
@@ -96,39 +95,62 @@ typedef struct SR_FragLenHist
 
     uint32_t size;                  // number of unique fragment length
 
-    uint32_t cutoff[2];             // cutoff of the probability
-
-    uint64_t modeCount[2];             // total counts of a histogram
+    uint64_t modeCount[2];          // total counts of a histogram
 
 }SR_FragLenHist;
+
+typedef struct SR_FragLenHistArray
+{
+    SR_FragLenHist* data;
+
+    uint32_t size;
+
+    uint32_t capacity;
+
+}SR_FragLenHistArray;
 
 // the object used to hold the fragment length distribution of all the read groups in a bam file
 typedef struct SR_FragLenDstrb
 {
-    char** pReadGrpNames;                          // read group name array
+    char** pSamples;
 
-    void* pReadGrpHash;                            // hash used to map the read group name to read group index
+    void* pSampleHash;
+
+    char** pReadGrps;
+
+    void* pReadGrpHash;
+
+    int8_t* pSeqTech;
+
+    int32_t* pSampleMap;
 
     SR_FragLenHist* pHists;                        // array of fragment length histograms
+
+    uint32_t sizeSM;
+
+    uint32_t capacitySM;
+    
+    uint32_t sizeRG;                                 // number of read groups found in the bam file
+
+    uint32_t capacityRG;                             // capacity of the read group name array
+
+    uint32_t sizeHist;
+
+    uint32_t capacityHist;
 
     int8_t validModeMap;                           // map the pair mode to its corresponding histogram, invalid pair mode will get a negative value
     
     int8_t validMode[NUM_ALLOWED_PAIR_MODE];       // the valid pair modes
-    
-    uint32_t size;                                 // number of read groups found in the bam file
-
-    uint32_t capacity;                             // capacity of the read group name array
-
-    SR_Bool hasRG;                                 // boolean variable to indicate if we find any read group names or not in the current bam file
 
 }SR_FragLenDstrb;
+
 
 
 //===============================
 // Constructors and Destructors
 //===============================
 
-SR_FragLenDstrb* SR_FragLenDstrbAlloc(uint32_t capacity);
+SR_FragLenDstrb* SR_FragLenDstrbAlloc(void);
 
 void SR_FragLenDstrbFree(SR_FragLenDstrb* pDstrb);
 
@@ -147,7 +169,7 @@ void SR_FragLenDstrbFree(SR_FragLenDstrb* pDstrb);
 // return:
 //      the mode of the pair
 //==================================================================
-SR_PairMode SR_GetPairMode(const SR_BamNode* pBamNode);
+SR_PairMode SR_GetPairMode(const bam1_t* pAlignment);
 
 //=======================================================================
 // function:
@@ -163,7 +185,7 @@ SR_PairMode SR_GetPairMode(const SR_BamNode* pBamNode);
 // return:
 //      if an error occurs, return SR_ERR; else return SR_OK
 //========================================================================
-SR_Status SR_LoadPairStats(SR_BamPairStats* pPairStats, const SR_BamNode* pBamNode);
+SR_Status SR_LoadPairStats(SR_BamPairStats* pPairStats, const bam1_t* pAlignment);
 
 
 void SR_FragLenDstrbSetPairMode(SR_FragLenDstrb* pDstrb, const int8_t* pValidPairMode);
@@ -230,8 +252,10 @@ void SR_FragLenDstrbFinalize(SR_FragLenDstrb* pDstrb);
 //      1. pDstrb: a pointer to a fragment length distribution object
 //      2. cutoff: the fragment length probability cutoff
 //========================================================================
-void SR_FragLenDstrbSetCutoff(SR_FragLenDstrb* pDstrb, double cutoff);
 
+void SR_FragLenDstrbInitHistHeader(const SR_FragLenDstrb* pDstrb, FILE* histOutput);
+
+void SR_FragLenDstrbWriteHistHeader(uint32_t numHists, FILE* histOutput);
 //=======================================================================
 // function:
 //      write the fragment length distribution into a file
@@ -240,7 +264,10 @@ void SR_FragLenDstrbSetCutoff(SR_FragLenDstrb* pDstrb, double cutoff);
 //      1. pDstrb: a pointer to a fragment length distribution object
 //      2. dstrbOutput: output stream
 //========================================================================
-void SR_FragLenDstrbWrite(const SR_FragLenDstrb* pDstrb, FILE* dstrbOutput);
+void SR_FragLenDstrbWriteHist(const SR_FragLenDstrb* pDstrb, FILE* histOutput);
+
+
+void SR_FragLenDstrbWriteInfo(const SR_FragLenDstrb* pDstrb, FILE* infoOutput);
 
 //=======================================================================
 // function:

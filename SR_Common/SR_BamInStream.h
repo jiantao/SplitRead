@@ -27,7 +27,7 @@
 // Type and constant definition
 //===============================
 
-typedef SR_Bool (*SR_BamFilter) (SR_BamNode* pBamNode, const void* pFilterData);
+typedef SR_StreamCode (*SR_BamFilter) (const bam1_t* pAlignment, void* pFilterData, int32_t currRefID, int32_t currBinPos);
 
 typedef enum SR_StreamControlFlag
 {
@@ -35,7 +35,7 @@ typedef enum SR_StreamControlFlag
 
     SR_USE_BAM_INDEX      = 1,   // bam in stream will open the bam index file and load it into memory
 
-    SR_PAIR_GENOMICALLY   = 2    // bam in stream will find read pairs genomically
+    SR_READ_PAIR_MODE     = 2    // bam in stream will find read pairs genomically
 
 }SR_StreamControlFlag;
 
@@ -43,7 +43,7 @@ typedef struct SR_StreamMode
 {
     SR_BamFilter filterFunc;             // a filter function used to skip those uninterested reads
 
-    const void* filterData;              // parameters for the filter function
+    void* filterData;                    // parameters for the filter function
 
     SR_StreamControlFlag controlFlag;    // flag used to control the bam in stream
 
@@ -80,7 +80,7 @@ typedef struct SR_BamInStream
 
     SR_BamFilter filterFunc;                   // customized filter function 
 
-    const void* filterData;                    // data used by the filter function
+    void* filterData;                          // data used by the filter function
 
     SR_BamMemPool* pMemPool;                   // memory pool used to allocate and recycle the bam alignments
 
@@ -102,7 +102,9 @@ typedef struct SR_BamInStream
 
     int32_t currBinPos;                        // the start position of current bin (0-based)
 
-    uint32_t binLen;                           // the length of bin
+    uint32_t binLen;                           // the length of the bin
+
+    SR_StreamControlFlag controlFlag; 
 
 }SR_BamInStream;
 
@@ -111,9 +113,7 @@ typedef struct SR_BamInStream
 // Constructors and Destructors
 //===============================
 
-SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename,               // name of input bam file
-                                    
-                                    uint32_t binLen,                       // search range of a pair
+SR_BamInStream* SR_BamInStreamAlloc(uint32_t binLen,                       // search range of a pair
                                     
                                     unsigned int numThreads,               // number of threads
                                      
@@ -121,7 +121,7 @@ SR_BamInStream* SR_BamInStreamAlloc(const char* bamFilename,               // na
                                     
                                     unsigned int reportSize,               // number of alignments should be cached before report
                                     
-                                    const SR_StreamMode* pStreamMode);     // a structure used to control the features of the stream
+                                    SR_StreamMode* pStreamMode);           // a structure used to control the features of the stream
 
 
 void SR_BamInStreamFree(SR_BamInStream* pBamInStream);
@@ -143,6 +143,16 @@ void SR_BamInStreamFree(SR_BamInStream* pBamInStream);
 //      if jumping succeeds, return SR_OK; if not, return SR_ERR
 //=============================================================== 
 SR_Status SR_BamInStreamJump(SR_BamInStream* pBamInStream, int32_t refID);
+
+SR_Status SR_BamInStreamOpen(SR_BamInStream* pBamInStream, const char* bamFileName);
+
+void SR_BamInStreamClear(SR_BamInStream* pBamInStream);
+
+void SR_BamInStreamClose(SR_BamInStream* pBamInStream);
+
+#define SR_BamInStreamTell(pBamInStream) bam_tell((pBamInStream)->fpBamInput)
+
+#define SR_BamInStreamSeek(pBamInStream, pos, where) bam_seek((pBamInStream)->fpBamInput, pos, where)
 
 //================================================================
 // function:
@@ -174,7 +184,7 @@ SR_BamHeader* SR_BamInStreamLoadHeader(SR_BamInStream* pBamInStream);
 //      4. controlFlag: flags used to control the stream
 // 
 //=============================================================== 
-static inline void SR_SetStreamMode(SR_StreamMode* pStreamMode, SR_BamFilter filterFunc, const void* filterData, SR_StreamControlFlag controlFlag)
+static inline void SR_SetStreamMode(SR_StreamMode* pStreamMode, SR_BamFilter filterFunc, void* filterData, SR_StreamControlFlag controlFlag)
 {
     pStreamMode->filterFunc = filterFunc;
     pStreamMode->filterData = filterData;
@@ -238,6 +248,42 @@ static inline SR_Status SR_BamInStreamRead(bam1_t* pAlignment, SR_BamInStream* p
 //      else, return SR_ERR
 //==================================================================
 SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo, SR_BamInStream* pBamInStream);
+
+//==================================================================
+// function:
+//      check if a pair of alignment is qualified unique-orphan 
+//      pair
+//
+// args:
+//      ppAnchor: a pointer to a pointer of bam node with anchor
+//                alignment
+//      ppOrphan: a pointer to a pointer of bam node with orphan
+//                alignment
+//      scTolerance: soft clipping tolerance
+//
+// return:
+//      if they are qualified unique orphan pair return TRUE
+//      else return FALSE
+//==================================================================
+SR_AlgnType SR_GetAlignmentType(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo, double scTolerance, double maxMismatchRate, unsigned char minMQ);
+
+//==================================================================
+// function:
+//      load a certain number of unique orphan pairs into a buffer
+//      associated with a thread
+//
+// args:
+//      1. pBamInStream: a pointer to a bam in stream object
+//      2. threadID: the ID of the thread
+//      3. scTolerance: soft clipping tolerance
+//
+// return:
+//      status of the bam in stream. if we reach the end of a
+//      chromosome, return SR_OUT_OF_RANGE; if we reach the end of
+//      the file, return SR_EOF; if an error happens, return
+//      SR_ERR; else return SR_OK
+//==================================================================
+SR_Status SR_LoadAlgnPairs(SR_BamInStream* pBamInStream, unsigned int threadID, double scTolerance, double maxMismatchRate, unsigned char minMQ);
 
 //================================================================
 // function:
@@ -346,5 +392,6 @@ static inline SR_Status SR_BamInStreamPush(SR_BamInStream* pBamInStream, SR_BamN
 //================================================================
 unsigned int SR_BamInStreamShrinkPool(SR_BamInStream* pBamInStream, unsigned int newSize);
 
+void SR_CheckBamInStream(int* pPrevHashSize, int* pCurrHashSize, int* pPrevListSize, int* pCurrListSize, const SR_BamInStream* pBamInStream);
 
 #endif  /*SR_BAMINSTREAM_H*/

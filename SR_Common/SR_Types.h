@@ -93,6 +93,24 @@ typedef enum
 
 }SR_PairMode;
 
+typedef enum
+{
+    STREAM_PASS   = -1,
+
+    STREAM_RETRUN = 0,
+
+    STREAM_KEEP = 1
+
+}SR_StreamCode;
+
+typedef enum
+{
+    ORDINARY_ONLY = 0,
+
+    ALL_SV = 1
+
+}SR_DetectMode;
+
 typedef SR_SeqAction SR_Strand;
 
 #define MD5_CHECKSUM_LEN 16
@@ -101,6 +119,8 @@ typedef SR_SeqAction SR_Strand;
 
 #define MAX_HASH_SIZE 12
 
+#define SR_MAX_LINE 1024
+
 #define SR_EMPTY 0
 
 #define NUM_TOTAL_PAIR_MODE 8
@@ -108,5 +128,9 @@ typedef SR_SeqAction SR_Strand;
 #define NUM_ALLOWED_PAIR_MODE 2
 
 #define NUM_ALLOWED_HIST 2
+
+// mismatch code for cigar
+#define BAM_CMISMATCH 8
+
 
 #endif  /*SR_TYPES_H*/

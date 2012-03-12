@@ -20,11 +20,10 @@
 #define  SR_BAMPAIRAUX_H
 
 
+#include "bam.h"
 #include "SR_Types.h"
-#include "SR_BamMemPool.h"
-#include "SR_BamInStream.h"
-#include "SR_FragLenDstrb.h"
 #include "SR_Utilities.h"
+#include "SR_LibInfo.h"
 
 
 //===============================
@@ -37,103 +36,73 @@ static const unsigned int SR_NORMAL_FMASK = (BAM_FSECONDARY | BAM_FQCFAIL | BAM_
 
 static const unsigned int SR_READ_PAIR_FMASK = (BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP | BAM_FUNMAP | BAM_FMUNMAP);
 
+typedef struct SR_FilterDataRP
+{
+    bam1_t* pUpAlgn;
+
+    bam1_t* pDownAlgn;
+
+    bamFile pBamInput;
+
+    bam_index_t* pBamIndex;
+
+    const SR_AnchorInfo* pAnchorInfo;
+
+    uint32_t binLen;
+
+    SR_Bool loadCross;
+
+    SR_Bool isFilled;
+
+}SR_FilterDataRP;
+
+
+SR_FilterDataRP* SR_FilterDataRPAlloc(const SR_AnchorInfo* pAnchorInfo, uint32_t binLen);
+
+void SR_FilterDataRPFree(SR_FilterDataRP* pFilterData);
+
 //======================
 // Interface functions
 //======================
 
-static inline SR_Bool SR_CommonFilter(SR_BamNode* pBamNode, const void* filterData)
+static inline SR_StreamCode SR_CommonFilter(const bam1_t* pAlignment, void* pFilterData, int32_t currRefID, int32_t currBinPos)
 {
-    if ((pBamNode->alignment.core.flag & BAM_FPAIRED) == 0
-        || strcmp(bam1_qname(&(pBamNode->alignment)), "*") == 0
-        || (pBamNode->alignment.core.flag & SR_UNIQUE_ORPHAN_FMASK) != 0
-        || (pBamNode->alignment.core.flag | (BAM_FUNMAP | BAM_FMUNMAP)) == pBamNode->alignment.core.flag)
+    if ((pAlignment->core.flag & BAM_FPAIRED) == 0
+        || strcmp(bam1_qname(pAlignment), "*") == 0
+        || (pAlignment->core.flag & SR_UNIQUE_ORPHAN_FMASK) != 0
+        || (pAlignment->core.flag | (BAM_FUNMAP | BAM_FMUNMAP)) == pAlignment->core.flag)
     {
-        return TRUE;
+        return STREAM_PASS;
     }
     
-    return FALSE;
+    return STREAM_KEEP;
 }
 
-static inline SR_Bool SR_NormalFilter(SR_BamNode* pBamNode, const void* filterData)
+static inline SR_StreamCode SR_NormalFilter(const bam1_t* pAlignment, void* pFilterData, int32_t currRefID, int32_t currBinPos)
 {
-    if ((pBamNode->alignment.core.flag & BAM_FPAIRED) == 0
-        || strcmp(bam1_qname(&(pBamNode->alignment)), "*") == 0
-        || (pBamNode->alignment.core.flag & SR_NORMAL_FMASK) != 0
-        || (pBamNode->alignment.core.isize == 0))
+    if ((pAlignment->core.flag & BAM_FPAIRED) == 0
+        || strcmp(bam1_qname(pAlignment), "*") == 0
+        || (pAlignment->core.flag & SR_NORMAL_FMASK) != 0
+        || (pAlignment->core.isize == 0))
     {
-        return TRUE;
+        return STREAM_PASS;
     }
 
     // any reads aligned to different chromosome will be kept as SV candidates
-    if (pBamNode->alignment.core.tid != pBamNode->alignment.core.mtid)
-        return TRUE;
+    if (pAlignment->core.tid != pAlignment->core.mtid)
+        return STREAM_PASS;
 
-    return FALSE;
+    return STREAM_KEEP;
 }
 
-SR_Bool SR_ReadPairFilter(SR_BamNode* pBamNode, const void* filterData);
+void SR_FilterDataRPInit(SR_FilterDataRP* pFilterData, const char* bamInputFile);
 
-//==================================================================
-// function:
-//      check if a pair of alignment is qualified unique-orphan 
-//      pair
-//
-// args:
-//      ppAnchor: a pointer to a pointer of bam node with anchor
-//                alignment
-//      ppOrphan: a pointer to a pointer of bam node with orphan
-//                alignment
-//      scTolerance: soft clipping tolerance
-//
-// return:
-//      if they are qualified unique orphan pair return TRUE
-//      else return FALSE
-//==================================================================
-SR_AlgnType SR_GetAlignmentType(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo, double scTolerance, double maxMismatchRate, unsigned char minMQ);
+#define SR_FilterDataRPTurnOffCross(pFilterData) (pFilterData)->loadCross = FALSE
 
-//==================================================================
-// function:
-//      load a certain number of unique orphan pairs into a buffer
-//      associated with a thread
-//
-// args:
-//      1. pBamInStream: a pointer to a bam in stream object
-//      2. threadID: the ID of the thread
-//      3. scTolerance: soft clipping tolerance
-//
-// return:
-//      status of the bam in stream. if we reach the end of a
-//      chromosome, return SR_OUT_OF_RANGE; if we reach the end of
-//      the file, return SR_EOF; if an error happens, return
-//      SR_ERR; else return SR_OK
-//==================================================================
-SR_Status SR_LoadAlgnPairs(SR_BamInStream* pBamInStream, SR_FragLenDstrb* pDstrb, unsigned int threadID, double scTolerance, double maxMismatchRate, unsigned char minMQ);
+#define SR_FilterDataRPTurnOnCross(pFilterData) (pFilterData)->loadCross = TRUE
 
-//====================================================================
-// function:
-//      check if a pair of read is normal
-//
-// args:
-//      1. ppUpAlgn: a pointer of the pointer to a bam node object
-//                   for the alignment with smaller coordinate
-//      1. ppDownAlgn: a pointer of the pointer to a bam node object
-//                   for the alignment with greater coordinate
-//
-// return:
-//      if the pair of read is normal, return TRUE; else, return
-//      FALSE
-//=====================================================================
-static inline SR_Bool SR_IsNormalPair(SR_BamNode** ppUpAlgn, SR_BamNode** ppDownAlgn, unsigned short minMQ)
-{
-    if (((*ppUpAlgn)->alignment.core.flag & BAM_FUNMAP) != 0
-        || ((*ppDownAlgn)->alignment.core.flag & BAM_FUNMAP) != 0
-        || (*ppUpAlgn)->alignment.core.qual < minMQ 
-        || (*ppDownAlgn)->alignment.core.qual < minMQ)
-    {
-        return FALSE;
-    }
+SR_StreamCode SR_ReadPairFilter(const bam1_t* pAlignment, void* pFilterData, int32_t cuuRefID, int32_t currBinPos);
 
-    return TRUE;
-}
+
     
 #endif  /*SR_BAMPAIRAUX_H*/

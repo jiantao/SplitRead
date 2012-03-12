@@ -16,190 +16,186 @@
  * =====================================================================================
  */
 
-#include "bam.h"
+#include "SR_Error.h"
 #include "SR_BamPairAux.h"
+#include "SR_BamInStream.h"
 
-
-// default soft clipping tolerance
-#define DEFAULT_SC_TOLERANCE 0.2
-
-#define DEFAULT_MAX_MISMATCH_RATE 0.1
-
-#define BAM_CMISMATCH 8
-
-// alignment status
-enum AlignmentStatus
+static SR_Status SR_LoadMate(bam1_t* pMate, const bam1_t* pAlignment, bamFile pBamInput, bam_index_t* pBamIndex)
 {
-    NONE_GOOD   = -1,       // neither a good anchor nor a good orphan candidate
+    // jump and read the first alignment in the given chromosome
+    bam_iter_t pBamIter = bam_iter_query(pBamIndex, pAlignment->core.mtid, pAlignment->core.mpos, pAlignment->core.mpos + 1);
 
-    GOOD_ANCHOR    = 0,     // a good anchor candidate
-
-    GOOD_ORPHAN    = 1,     // a good orphan candidate
-
-    GOOD_SOFT      = 2,     // a good soft clipping candidate
-
-    GOOD_MULTIPLE  = 3,     // a good multiple aligned candidate
-};
-
-static double SR_GetMismatchRate(const bam1_t* pAlignment)
-{
-    uint32_t* cigar = bam1_cigar(pAlignment);
-    unsigned int numMismatch = 0;
-    for (unsigned i = 0; i != pAlignment->core.n_cigar; ++i)
+    int ret;
+    SR_Status retStatus = SR_ERR;
+    while ((ret = bam_iter_read(pBamInput, pBamIter, pMate)) >= 0)
     {
-        int type = (cigar[i] & BAM_CIGAR_MASK);
-        if (type == BAM_CINS || type == BAM_CDEL || type == BAM_CSOFT_CLIP || type == BAM_CMISMATCH)
+        if (strcmp(bam1_qname(pMate), bam1_qname(pAlignment)) == 0)
         {
-            numMismatch += (cigar[i] >> BAM_CIGAR_SHIFT);
+            retStatus = SR_OK;
+            break;
         }
     }
 
-    return ((double) numMismatch / pAlignment->core.l_qseq);
+    bam_iter_destroy(pBamIter);
+    return retStatus;
 }
 
-static int SR_CheckAlignment(const bam1_t* pAlignment, double scTolerance, double maxMismatchRate, unsigned char minMQ)
+
+SR_FilterDataRP* SR_FilterDataRPAlloc(const SR_AnchorInfo* pAnchorInfo, uint32_t binLen)
 {
-    if ((pAlignment->core.flag & BAM_FUNMAP) != 0)
-        return GOOD_ORPHAN;
+    SR_FilterDataRP* pFilterData = (SR_FilterDataRP*) malloc(sizeof(SR_FilterDataRP));
+    if (pFilterData == NULL)
+        SR_ErrQuit("ERROR: Not enough memory for a filter data object.\n");
 
-    unsigned int scLimit = scTolerance * pAlignment->core.l_qseq;
-    uint32_t* cigar = bam1_cigar(pAlignment);
+    pFilterData->binLen = binLen;
+    pFilterData->isFilled = FALSE;
+    pFilterData->loadCross = FALSE;
+    pFilterData->pAnchorInfo = pAnchorInfo;
 
-    SR_Bool isHeadSC = FALSE;
-    SR_Bool isTailSC = FALSE;
+    pFilterData->pBamInput = NULL;
+    pFilterData->pBamIndex = NULL;
 
-    if ((cigar[0] & BAM_CIGAR_MASK) == BAM_CSOFT_CLIP 
-        && (cigar[0] >> BAM_CIGAR_SHIFT) >= scLimit)
+    pFilterData->pUpAlgn = bam_init1();
+    pFilterData->pDownAlgn = bam_init1();
+
+    return pFilterData;
+}
+
+void SR_FilterDataRPFree(SR_FilterDataRP* pFilterData)
+{
+    if (pFilterData != NULL)
     {
-        isHeadSC = TRUE;
+        if (pFilterData->pBamInput != NULL)
+            bam_close(pFilterData->pBamInput);
+
+        if (pFilterData->pBamIndex != NULL)
+            bam_index_destroy(pFilterData->pBamIndex);
+
+        bam_destroy1(pFilterData->pUpAlgn);
+        bam_destroy1(pFilterData->pDownAlgn);
+
+        free(pFilterData);
+    }
+}
+
+void SR_FilterDataRPInit(SR_FilterDataRP* pFilterData, const char* bamInputFile)
+{
+    if(pFilterData->pBamInput != NULL)
+        bam_close(pFilterData->pBamInput);
+
+    if (pFilterData->pBamIndex != NULL)
+        bam_index_destroy(pFilterData->pBamIndex);
+
+    pFilterData->pBamInput = bam_open(bamInputFile, "r");
+    if (pFilterData->pBamInput == NULL)
+        SR_ErrQuit("ERROR: Cannot open the bam file: %s.\n", bamInputFile);
+
+    pFilterData->pBamIndex = bam_index_load(bamInputFile);
+    if (pFilterData->pBamIndex == NULL)
+        SR_ErrQuit("ERROR: Cannot open the index file for this bam: %s.\n", bamInputFile);
+}
+
+SR_StreamCode SR_ReadPairFilter(const bam1_t* pAlignment, void* pFilterData, int32_t currRefID, int32_t currBinPos)
+{
+    // this is the fragment length distribution
+    SR_FilterDataRP* pDataRP = (SR_FilterDataRP*) pFilterData;
+    pDataRP->isFilled = FALSE;
+
+    if ((pAlignment->core.flag & BAM_FPAIRED) == 0
+        || strcmp(bam1_qname(pAlignment), "*") == 0
+        || (pAlignment->core.flag & SR_READ_PAIR_FMASK) != 0)
+    {
+        return STREAM_PASS;
     }
 
-    unsigned int lastIndex = pAlignment->core.n_cigar - 1;
-    if ((cigar[lastIndex] & BAM_CIGAR_MASK) == BAM_CSOFT_CLIP 
-        && (cigar[lastIndex] >> BAM_CIGAR_SHIFT) >= scLimit)
+    // if any of the mate of a read pair lands on an unused reference we filter them out
+    if (pDataRP->pAnchorInfo->pLength[pAlignment->core.tid] < 0
+        || pDataRP->pAnchorInfo->pLength[pAlignment->core.mtid] < 0)
     {
-        isTailSC = TRUE;
+        return STREAM_PASS;
     }
 
-    if (!isHeadSC && !isTailSC) 
+    if (pAlignment->core.tid != pAlignment->core.mtid)
     {
-        if (pAlignment->core.qual >= minMQ)
-            return GOOD_ANCHOR;
-        else if (maxMismatchRate > 0.0)
+        if (pDataRP->loadCross && pAlignment->core.tid < pAlignment->core.mtid)
         {
-            double mismatchRate = SR_GetMismatchRate(pAlignment);
-            if (mismatchRate <= maxMismatchRate)
-                return GOOD_MULTIPLE;
+            SR_Status status = SR_LoadMate(pDataRP->pDownAlgn, pAlignment, pDataRP->pBamInput, pDataRP->pBamIndex);
+            if (status == SR_OK)
+            {
+                bam_copy1(pDataRP->pUpAlgn, pAlignment);
+                pDataRP->isFilled = TRUE;
+                return STREAM_RETRUN;
+            }
         }
 
-        return NONE_GOOD;
-    }
-    else if (isHeadSC && isTailSC)
-        return NONE_GOOD;
-    else
-        return GOOD_SOFT;
-}
-
-SR_AlgnType SR_GetAlignmentType(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo, double scTolerance, double maxMismatchRate, unsigned char minMQ)
-{
-    int firstType = SR_CheckAlignment(&((*ppAlgnOne)->alignment), scTolerance, maxMismatchRate, minMQ);
-    int secondType = SR_CheckAlignment(&((*ppAlgnTwo)->alignment), scTolerance, maxMismatchRate, minMQ);
-
-    if (firstType != GOOD_ANCHOR && secondType == GOOD_ANCHOR)
-    {
-        SR_SWAP(*ppAlgnOne, *ppAlgnTwo, SR_BamNode*);
-        SR_SWAP(firstType, secondType, int);
+        return STREAM_PASS;
     }
 
-    if (firstType == GOOD_ANCHOR)
+    if (currRefID != pAlignment->core.tid || currBinPos < 0)
     {
-        switch(secondType)
+        currRefID = pAlignment->core.tid;
+        currBinPos = pAlignment->core.pos;
+    }
+
+    SR_Bool shouldLoad = FALSE;
+    if (pAlignment->core.pos <= pAlignment->core.mpos)
+    {
+        if (pAlignment->core.pos < currBinPos + pDataRP->binLen)
         {
-            case GOOD_ORPHAN:
-                return SR_UNIQUE_ORPHAN;
-                break;
-            case GOOD_SOFT:
-                return SR_UNIQUE_SOFT;
-                break;
-            case GOOD_MULTIPLE:
-                return SR_UNIQUE_MULTIPLE;
-                break;
-            case GOOD_ANCHOR:
-                return SR_UNIQUE_NORMAL;
-                break;
-            default:
-                return SR_OTHER_ALGN_TYPE;
-                break;
+            if (pAlignment->core.mpos >= currBinPos + 2 * pDataRP->binLen)
+                shouldLoad = TRUE;
         }
-    }
-
-    return SR_OTHER_ALGN_TYPE;
-}
-
-/* 
-SR_Bool SR_IsUniqueOrphanPair(SR_BamNode** ppAnchor, SR_BamNode** ppOrphan, double scTolerance, unsigned char minMQ)
-{
-    int anchorStatus = SR_CheckAlignment(&((*ppAnchor)->alignment), scTolerance, minMQ);
-    int orphanStatus = SR_CheckAlignment(&((*ppOrphan)->alignment), scTolerance, minMQ);
-
-    if ((anchorStatus == NEITHER_GOOD || orphanStatus == NEITHER_GOOD)
-        || (anchorStatus == GOOD_ANCHOR && orphanStatus == GOOD_ANCHOR)
-        || (anchorStatus == GOOD_ORPHAN && orphanStatus == GOOD_ORPHAN))
-    {
-        return FALSE;
-    }
-    else if (anchorStatus == GOOD_ORPHAN)
-        SR_SWAP(*ppAnchor, *ppOrphan, SR_BamNode*);
-
-    return TRUE;
-}
-
-SR_Status SR_LoadUniquOrphanPairs(SR_BamInStream* pBamInStream, unsigned int threadID, double scTolerance, unsigned char minMQ)
-{
-    SR_BamNode* pAnchor = NULL;
-    SR_BamNode* pOrphan = NULL;
-
-    SR_Status readerStatus = SR_OK;
-    SR_Status bufferStatus = SR_OK;
-    while ((readerStatus = SR_BamInStreamLoadPair(&pAnchor, &pOrphan, pBamInStream)) == SR_OK)
-    {
-        if (SR_IsUniqueOrphanPair(&pAnchor, &pOrphan, scTolerance, minMQ))
+        else if (pAlignment->core.pos >= currBinPos + 2 * pDataRP->binLen)
         {
-            SR_BamInStreamPush(pBamInStream, pAnchor, threadID);
-            bufferStatus = SR_BamInStreamPush(pBamInStream, pOrphan, threadID);
+            if (pAlignment->core.mpos >= pAlignment->core.pos + 2 * pDataRP->binLen)
+                shouldLoad = TRUE;
         }
         else
         {
-            SR_BamInStreamRecycle(pBamInStream, pAnchor);
-            SR_BamInStreamRecycle(pBamInStream, pOrphan);
+            if (pAlignment->core.mpos >= pAlignment->core.pos + 3 * pDataRP->binLen)
+                shouldLoad = TRUE;
+        }
+    }
+    else
+    {
+        if (pAlignment->core.pos < currBinPos + pDataRP->binLen)
+        {
+            if (pAlignment->core.mpos + pDataRP->binLen < currBinPos)
+                return STREAM_PASS;
+        }
+        else if (pAlignment->core.pos >= 2 * currBinPos + pDataRP->binLen)
+        {
+            return STREAM_PASS;
+        }
+        else
+        {
+            if (pAlignment->core.mpos < currBinPos)
+                return STREAM_PASS;
+        }
+    }
+
+    if (shouldLoad)
+    {
+        SR_Status status = SR_LoadMate(pDataRP->pDownAlgn, pAlignment, pDataRP->pBamInput, pDataRP->pBamIndex);
+        if (status == SR_OK)
+        {
+            bam_copy1(pDataRP->pUpAlgn, pAlignment);
+            pDataRP->isFilled = TRUE;
+            return STREAM_RETRUN;
         }
 
-        if (bufferStatus == SR_FULL)
-            break;
+        return STREAM_PASS;
     }
 
-    return readerStatus;
+    return STREAM_KEEP;
 }
-*/
 
-SR_Bool SR_ReadPairFilter(SR_BamNode* pBamNode, const void* filterData)
-{
-    if ((pBamNode->alignment.core.flag & BAM_FPAIRED) == 0
-        || strcmp(bam1_qname(&(pBamNode->alignment)), "*") == 0
-        || (pBamNode->alignment.core.flag & SR_READ_PAIR_FMASK) != 0
-        || (pBamNode->alignment.core.isize == 0))
-    {
-        return TRUE;
-    }
-
+    /*
     // get the statistics of the read pair
-    SR_BamPairStats pairStats;
-    SR_Status status = SR_LoadPairStats(&pairStats, pBamNode);
+    SR_PairStats pairStats;
+    SR_Status status = SR_LoadPairStats(&pairStats, pAlignment);
     if (status == SR_ERR)
         return TRUE;
-
-    // this is the fragment length distribution
-    const SR_FragLenDstrb* pDstrb = (const SR_FragLenDstrb*) filterData;
 
     // any reads do not have valid read group name will be filtered out
     int32_t readGrpIndex = 0;
@@ -208,7 +204,7 @@ SR_Bool SR_ReadPairFilter(SR_BamNode* pBamNode, const void* filterData)
         return TRUE;
     
     // any reads aligned to different chromosome will be kept as SV candidates
-    if (pBamNode->alignment.core.tid != pBamNode->alignment.core.mtid)
+    if (pAlignment->core.tid != pAlignment->core.mtid)
     {
         return FALSE;
     }
@@ -231,42 +227,37 @@ SR_Bool SR_ReadPairFilter(SR_BamNode* pBamNode, const void* filterData)
 
     // at last, those reads with valid pair mode and proper fragment length will be filtered out
     return TRUE;
-}
 
-SR_Status SR_LoadAlgnPairs(SR_BamInStream* pBamInStream, SR_FragLenDstrb* pDstrb, unsigned int threadID, double scTolerance, double maxMismatchRate, unsigned char minMQ)
+    */
+
+
+/*  
+
+//====================================================================
+// function:
+//      check if a pair of read is normal
+//
+// args:
+//      1. ppUpAlgn: a pointer of the pointer to a bam node object
+//                   for the alignment with smaller coordinate
+//      1. ppDownAlgn: a pointer of the pointer to a bam node object
+//                   for the alignment with greater coordinate
+//
+// return:
+//      if the pair of read is normal, return TRUE; else, return
+//      FALSE
+//=====================================================================
+static inline SR_Bool SR_IsNormalPair(SR_BamNode** ppUpAlgn, SR_BamNode** ppDownAlgn, unsigned short minMQ)
 {
-    SR_BamNode* pAlgnOne = NULL;
-    SR_BamNode* pAlgnTwo = NULL;
-
-    SR_Status readerStatus = SR_OK;
-    SR_Status bufferStatus = SR_OK;
-    while ((readerStatus = SR_BamInStreamLoadPair(&pAlgnOne, &pAlgnTwo, pBamInStream)) == SR_OK)
+    if (((*ppUpAlgn)->alignment.core.flag & BAM_FUNMAP) != 0
+        || ((*ppDownAlgn)->alignment.core.flag & BAM_FUNMAP) != 0
+        || (*ppUpAlgn)->alignment.core.qual < minMQ 
+        || (*ppDownAlgn)->alignment.core.qual < minMQ)
     {
-        SR_AlgnType algnType = SR_GetAlignmentType(&pAlgnOne, &pAlgnTwo, scTolerance, maxMismatchRate, minMQ);
-        if ((algnType == SR_UNIQUE_ORPHAN || algnType == SR_UNIQUE_SOFT || algnType == SR_UNIQUE_MULTIPLE) && pBamInStream->numThreads > 0)
-        {
-            SR_BamInStreamPush(pBamInStream, pAlgnOne, threadID);
-            bufferStatus = SR_BamInStreamPush(pBamInStream, pAlgnTwo, threadID);
-
-            SR_BamInStreamSetAlgnType(pBamInStream, threadID, algnType);
-        }
-        else
-        {
-            if (algnType == SR_UNIQUE_NORMAL && pDstrb != NULL)
-            {
-                SR_BamPairStats pairStats;
-                SR_Status modeStatus = SR_LoadPairStats(&pairStats, pAlgnOne);
-                if (modeStatus == SR_OK)
-                    SR_FragLenDstrbUpdate(pDstrb, &pairStats);
-            }
-
-            SR_BamInStreamRecycle(pBamInStream, pAlgnOne);
-            SR_BamInStreamRecycle(pBamInStream, pAlgnTwo);
-        }
-
-        if (bufferStatus == SR_FULL)
-            break;
+        return FALSE;
     }
 
-    return readerStatus;
+    return TRUE;
 }
+
+*/
