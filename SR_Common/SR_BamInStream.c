@@ -241,6 +241,7 @@ void SR_BamInStreamFree(SR_BamInStream* pBamInStream)
 // Interface functions
 //======================
 
+// open a bam file
 SR_Status SR_BamInStreamOpen(SR_BamInStream* pBamInStream, const char* bamFilename)
 {
     pBamInStream->fpBamInput = bam_open(bamFilename, "r");
@@ -263,6 +264,7 @@ SR_Status SR_BamInStreamOpen(SR_BamInStream* pBamInStream, const char* bamFilena
     return SR_OK;
 }
 
+// clear the bam instream object(return list, alignment list and name hash)
 void SR_BamInStreamClear(SR_BamInStream* pBamInStream)
 {
     pBamInStream->pNewNode = NULL;
@@ -279,6 +281,7 @@ void SR_BamInStreamClear(SR_BamInStream* pBamInStream)
     kh_clear(queryName, pBamInStream->pNameHashes[CURR_BIN]);
 }
 
+// close the current bam files and clear the bam instream
 void SR_BamInStreamClose(SR_BamInStream* pBamInStream)
 {
     bam_close(pBamInStream->fpBamInput);
@@ -389,18 +392,6 @@ SR_BamHeader* SR_BamInStreamLoadHeader(SR_BamInStream* pBamInStream)
     }
 
     return pBamHeader;
-}
-
-void SR_CheckBamInStream(int* pPrevHashSize, int* pCurrHashSize, int* pPrevListSize, int* pCurrListSize, const SR_BamInStream* pBamInStream)
-{
-    khash_t(queryName)* pNameHashPrev = pBamInStream->pNameHashes[PREV_BIN];
-    khash_t(queryName)* pNameHashCurr = pBamInStream->pNameHashes[CURR_BIN];
-
-    *pPrevHashSize = kh_size(pNameHashPrev);
-    *pCurrHashSize = kh_size(pNameHashCurr);
-
-    *pPrevListSize = pBamInStream->pAlgnLists[PREV_BIN].numNode;
-    *pCurrListSize = pBamInStream->pAlgnLists[CURR_BIN].numNode;
 }
 
 // load a unique-orphan pair from a bam file
@@ -527,6 +518,7 @@ SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppUpAlgn, SR_BamNode** ppDownAlgn,
     return ret;
 }
 
+// get the alignment type from a read pair
 SR_AlgnType SR_GetAlignmentType(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo, double scTolerance, double maxMismatchRate, unsigned char minMQ)
 {
     int firstType = SR_CheckAlignment(&((*ppAlgnOne)->alignment), scTolerance, maxMismatchRate, minMQ);
@@ -563,6 +555,7 @@ SR_AlgnType SR_GetAlignmentType(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo, 
     return SR_OTHER_ALGN_TYPE;
 }
 
+// load a pair of bam alignments
 SR_Status SR_LoadAlgnPairs(SR_BamInStream* pBamInStream, unsigned int threadID, double scTolerance, double maxMismatchRate, unsigned char minMQ)
 {
     SR_BamNode* pAlgnOne = NULL;
@@ -593,6 +586,7 @@ SR_Status SR_LoadAlgnPairs(SR_BamInStream* pBamInStream, unsigned int threadID, 
     return readerStatus;
 }
 
+// decrease the size of memory pool inside the bam in stream object to save memory
 unsigned int SR_BamInStreamShrinkPool(SR_BamInStream* pBamInStream, unsigned int newSize)
 {
     unsigned int currSize = pBamInStream->pMemPool->numBuffs;

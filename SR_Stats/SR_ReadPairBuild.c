@@ -81,10 +81,13 @@ KHASH_MAP_INIT_STR(name, uint32_t);
 
 KHASH_MAP_INIT_INT(file, SR_ReadPairOutStream);
 
+// check the read pair type
 static SV_ReadPairType SR_CheckReadPairType(const SR_ZAtag* pZAtag, const SR_PairStats* pPairStats, const SR_LibInfoTable* pLibTable)
 {
+    // check the za tag first if it is available
     if (pZAtag != NULL)
     {
+        // special reference name starting with ' ' means empty
         if (pZAtag->spRef[0][0] != ' ' && pZAtag->spRef[1][0] != ' ')
             return PT_UNKNOWN;
         else if (pZAtag->spRef[0][0] == ' ' && pZAtag->spRef[1][0] != ' ')
@@ -102,6 +105,7 @@ static SV_ReadPairType SR_CheckReadPairType(const SR_ZAtag* pZAtag, const SR_Pai
                 return PT_UNKNOWN;
         }
 
+        // only leave those unique-unique pairs for further judgement
         if (pZAtag->numMappings[0] != 1 || pZAtag->numMappings[1] != 1)
             return PT_UNKNOWN;
     }
@@ -132,6 +136,7 @@ static SV_ReadPairType SR_CheckReadPairType(const SR_ZAtag* pZAtag, const SR_Pai
     }
 }
 
+// update the local pair array
 static void SR_LocalPairArrayUpdate(SR_LocalPairArray* pLocalPairArray, const bam1_t* pUpAlgn, const bam1_t* pDownAlgn, const SR_LibInfoTable* pLibTable, 
         const SR_FragLenHistArray* pHistArray, const SR_PairStats* pPairStats, SV_ReadPairType readPairType)
 {
@@ -164,6 +169,7 @@ static void SR_LocalPairArrayUpdate(SR_LocalPairArray* pLocalPairArray, const ba
     ++(pLocalPairArray->size);
 }
 
+// update the inverted array
 static void SR_InvertedPairArrayUpdate(SR_LocalPairArray* pInvertedPairArray, const bam1_t* pUpAlgn, const bam1_t* pDownAlgn, 
         const SR_PairStats* pPairStats, SV_ReadPairType readPairType)
 {
@@ -196,6 +202,7 @@ static void SR_InvertedPairArrayUpdate(SR_LocalPairArray* pInvertedPairArray, co
     ++(pInvertedPairArray->size);
 }
 
+// update the cross pair array
 static void SR_CrossPairArrayUpdate(SR_CrossPairArray* pCrossPairArray, const bam1_t* pUpAlgn, const bam1_t* pDownAlgn, const SR_PairStats*  pPairStats)
 {
     if (pCrossPairArray->size == pCrossPairArray->capacity)
@@ -229,6 +236,7 @@ static void SR_CrossPairArrayUpdate(SR_CrossPairArray* pCrossPairArray, const ba
     ++(pCrossPairArray->size);
 }
 
+// update the special pair table
 static void SR_SpecialPairTableUpdate(SR_SpecialPairTable* pSpecialPairTable, const bam1_t* pUpAlgn, const bam1_t* pDownAlgn, const SR_LibInfoTable* pLibTable, 
         const SR_FragLenHistArray* pHistArray, const SR_PairStats* pPairStats, const SR_ZAtag* pZAtag, SV_ReadPairType readPairType)
 {
@@ -249,6 +257,7 @@ static void SR_SpecialPairTableUpdate(SR_SpecialPairTable* pSpecialPairTable, co
     pSpecialPairTable->names[pSpecialPairTable->size][0] = pZAtag->spRef[specialIndex][0];
     pSpecialPairTable->names[pSpecialPairTable->size][1] = pZAtag->spRef[specialIndex][1];
 
+    //  get the special reference ID
     int ret = 0;
     int spRefID = 0;
     khiter_t khIter = kh_put(name, pSpecialPairTable->nameHash, pSpecialPairTable->names[pSpecialPairTable->size], &ret);
@@ -265,6 +274,7 @@ static void SR_SpecialPairTableUpdate(SR_SpecialPairTable* pSpecialPairTable, co
     const bam1_t* pAlgns[2] = {pUpAlgn, pDownAlgn};
     SR_SpecialPairArray* pSpecialPairArray = NULL;
 
+    // to see which special pairs array should we use
     if (pAlgns[anchorIndex]->core.tid == pUpAlgn->core.tid)
         pSpecialPairArray = &(pSpecialPairTable->array);
     else
@@ -313,13 +323,17 @@ static void SR_SpecialPairTableUpdate(SR_SpecialPairTable* pSpecialPairTable, co
     ++(pSpecialPairArray->size);
 }
 
-void SR_SpecialPairTableClear(SR_SpecialPairTable* pSpecialPairTable, unsigned int numChr)
+static void SR_SpecialPairTableClear(SR_SpecialPairTable* pSpecialPairTable, unsigned int numChr)
 {
     pSpecialPairTable->array.size = 0;
     memset(pSpecialPairTable->array.chrCount, 0, sizeof(uint64_t) * numChr);
 
     pSpecialPairTable->crossArray.size = 0;
 }
+
+//===============================
+// Constructors and Destructors
+//===============================
 
 SR_SpecialPairTable* SR_SpecialPairTableAlloc(unsigned int numChr)
 {
@@ -458,6 +472,15 @@ void SR_ReadPairTableFree(SR_ReadPairTable* pReadPairTable)
     }
 }
 
+
+//======================
+// Interface functions
+//======================
+
+// read the bam alignments from the primary bam files, 
+// extract the SV-related information out and wirte it into 
+// read pair files according to the read pair type and 
+// location
 void SR_ReadPairBuild(const SR_ReadPairBuildPars* pBuildPars)
 {
     // some default capacity of the containers
@@ -680,217 +703,7 @@ void SR_ReadPairBuild(const SR_ReadPairBuildPars* pBuildPars)
     SR_BamInStreamFree(pBamInStream);
 }
 
-/* 
-void SR_ReadPairBuild(const SR_ReadPairBuildPars* pBuildPars)
-{
-    // some default capacity of the containers
-    unsigned int buffCapacity = 100;
-    unsigned int capAnchor = 150;
-    unsigned int capSample = 20;
-    unsigned int capReadGrp = 20;
-    unsigned int capHist = 10;
-
-    // phony parameters for the bam input stream
-    unsigned int reportSize = 0;
-    unsigned int numThread = 0;
-
-    // initialize the library information table
-    SR_LibInfoTable* pLibTable = SR_LibInfoTableAlloc(capAnchor, capSample, capReadGrp);
-    SR_LibInfoTableSetCutoff(pLibTable, pBuildPars->cutoff);
-    SR_LibInfoTableSetTrimRate(pLibTable, pBuildPars->trimRate);
-
-    // this is the data used to filter the read pairs in the bam
-    SR_FilterDataRP* pFilterData = SR_FilterDataRPAlloc(pLibTable->pAnchorInfo, pBuildPars->binLen);
-
-    // set the stream mode to read pair filter
-    SR_StreamMode streamMode;
-    SR_SetStreamMode(&streamMode, SR_ReadPairFilter, pFilterData, SR_READ_PAIR_MODE);
-
-    // structure initialization
-    SR_BamInStream* pBamInStream = SR_BamInStreamAlloc(pBuildPars->binLen, numThread, buffCapacity, reportSize, &streamMode);
-    SR_FragLenHistArray* pHistArray = SR_FragLenHistArrayAlloc(capHist);
-    SR_BamHeader* pBamHeader = NULL;
-
-    // a flag to indicate if we have created the read pair table
-    SR_Bool hasReadPairTable = FALSE;
-    SR_ReadPairTable* pReadPairTable = NULL;
-
-    // file hash
-    khash_t(file)* pFileHash = NULL;
-
-    // required arguments for bam in stream structure
-    char* histOutputFile = SR_CreateFileName(pBuildPars->workingDir, SR_HistFileName);
-
-    // open the fragment length histogram output file
-    FILE* histOutput = fopen(histOutputFile, "w");
-    if (histOutput == NULL)
-        SR_ErrQuit("ERROR: Cannot open fragment length histogram file: %s\n", histOutputFile);
-
-    char bamFileName[1024];
-    while (SR_GetNextLine(bamFileName, 1024, pBuildPars->fileListInput) == SR_OK)
-    {
-        // update the fitler data with new bam file
-        SR_FilterDataRPInit(pFilterData, bamFileName);
-
-        // open the bam file
-        SR_BamInStreamOpen(pBamInStream, bamFileName);
-
-        // load the bam header before read any alignments
-        pBamHeader = SR_BamInStreamLoadHeader(pBamInStream);
-
-        // get the file position of the bam aligments
-        int64_t bamPos = SR_BamInStreamTell(pBamInStream);
-
-        // process the header information
-        unsigned int oldSize = 0;
-        SR_LibInfoTableSetRG(pLibTable, &oldSize, pBamHeader);
-
-        // initialize the fragment length histogram array with the number of newly added libraries in the bam file
-        SR_FragLenHistArrayInit(pHistArray, pLibTable->size - oldSize);
-
-        SR_BamNode* pUpNode = NULL;
-        SR_BamNode* pDownNode = NULL;
-
-        const bam1_t* pUpAlgn = NULL;
-        const bam1_t* pDownAlgn = NULL;
-
-        SR_Status bamStatus = SR_OK;
-        while ((bamStatus = SR_BamInStreamLoadPair(&pUpNode, &pDownNode, pBamInStream)) != SR_EOF && bamStatus != SR_ERR)
-        {
-            // we hit another chromosome
-            if (bamStatus == SR_OUT_OF_RANGE)
-                continue;
-
-            // load the read pairs
-            if (!pFilterData->isFilled)
-            {
-                // usually we should catch the read pairs here
-                // since their fragment length should be smaller than the bin length
-                pUpAlgn = &(pUpNode->alignment);
-                pDownAlgn = &(pDownNode->alignment);
-            }
-            else
-            {
-                // if the fragment length of the read pair is beyond our bin length
-                // we should catch them here
-                pUpAlgn = pFilterData->pUpAlgn;
-                pDownAlgn = pFilterData->pDownAlgn;
-            }
-
-            // check if the incoming read pair is normal (unique-unique pair)
-            // if yes, then update the corresponding fragment length histogram
-            SR_PairStats pairStats;
-            unsigned int backHistIndex = 0;
-            if (SR_IsNormalPair(&pairStats, &backHistIndex, pUpAlgn, pDownAlgn, pLibTable, pBuildPars->minMQ))
-                SR_FragLenHistArrayUpdate(pHistArray, backHistIndex, pairStats.fragLen);
-
-            // recycle those bam nodes that are allocated from the memory pool
-            if (!pFilterData->isFilled)
-            {
-                SR_BamInStreamRecycle(pBamInStream, pUpNode);
-                SR_BamInStreamRecycle(pBamInStream, pDownNode);
-            }
-        }
-
-        // finish the process of the histogram and update the library information table
-        SR_FragLenHistArrayFinalize(pHistArray);
-        SR_LibInfoTableUpdate(pLibTable, pHistArray, oldSize);
-
-        // write the fragment length histogram into the file
-        SR_FragLenHistArrayWrite(pHistArray, histOutput);
-
-
-        // rewind the bam file to the beginning of the alignments (right after the header)
-        SR_BamInStreamSeek(pBamInStream, bamPos, SEEK_SET);
-
-        // we only have to create the read pair table and open the read pair files once
-        if (!hasReadPairTable)
-        {
-            pReadPairTable = SR_ReadPairTableAlloc(pLibTable->pAnchorInfo->size, pBuildPars->detectSet); 
-            pFileHash = SR_ReadPairFilesOpen(pLibTable, pBuildPars->detectSet, pBuildPars->workingDir);
-            hasReadPairTable =TRUE;
-        }
-
-        while ((bamStatus = SR_BamInStreamLoadPair(&pUpNode, &pDownNode, pBamInStream)) != SR_EOF && bamStatus != SR_ERR)
-        {
-            // we hit another chromosome
-            if (bamStatus == SR_OUT_OF_RANGE)
-                continue;
-
-            // load the read pairs
-            if (!pFilterData->isFilled)
-            {
-                // usually we should catch the read pairs here
-                // since their fragment length should be smaller than the bin length
-                pUpAlgn = &(pUpNode->alignment);
-                pDownAlgn = &(pDownNode->alignment);
-            }
-            else
-            {
-                // if the fragment length of the read pair is beyond our bin length
-                // we should catch them here
-                pUpAlgn = pFilterData->pUpAlgn;
-                pDownAlgn = pFilterData->pDownAlgn;
-            }
-
-            SR_ZAtag zaTag;
-            SR_PairStats pairStats;
-
-            SR_Status readStatus = SR_LoadPairStats(&pairStats, pUpAlgn, pLibTable);
-            if (readStatus == SR_OK)
-            {
-                SR_Status ZAstatus = SR_LoadZAtag(&zaTag, pUpAlgn);
-                if (ZAstatus == SR_OK)
-                    SR_ReadPairTableUpdate(pReadPairTable, pUpAlgn, pDownAlgn, &zaTag, &pairStats, pLibTable, pHistArray, pBuildPars->minMQ);
-                else
-                    SR_ReadPairTableUpdate(pReadPairTable, pUpAlgn, pDownAlgn, NULL, &pairStats, pLibTable, pHistArray, pBuildPars->minMQ);
-            }
-
-            // recycle those bam nodes that are allocated from the memory pool
-            if (!pFilterData->isFilled)
-            {
-                SR_BamInStreamRecycle(pBamInStream, pUpNode);
-                SR_BamInStreamRecycle(pBamInStream, pDownNode);
-            }
-        }
-
-        SR_ReadPairTableWrite(pReadPairTable, pFileHash);
-        SR_ReadPairTableClear(pReadPairTable);
-
-        // close the bam file
-        SR_BamInStreamClose(pBamInStream);
-        SR_BamHeaderFree(pBamHeader);
-    }
-
-    // close all the read pair files
-    SR_ReadPairFilesClose(pFileHash);
-
-    // get the library table output file name
-    char* libTableOutputFile = SR_CreateFileName(pBuildPars->workingDir, SR_LibTableFileName);
-
-    // write the library information table into the file
-    FILE* libTableOutput = fopen(libTableOutputFile, "wb");
-    if (libTableOutput == NULL)
-        SR_ErrQuit("ERROR: Cannot open the library output file: %s\n", libTableOutputFile);
-
-    SR_LibInfoTableWrite(pLibTable, libTableOutput);
-    SR_SpecialPairTableWirteID(pReadPairTable->pSpecialPairTable, libTableOutput);
-
-    // clean up
-    fclose(histOutput);
-    fclose(libTableOutput);
-
-    free(libTableOutputFile);
-    free(histOutputFile);
-
-    SR_FragLenHistArrayFree(pHistArray);
-    SR_LibInfoTableFree(pLibTable);
-    SR_FilterDataRPFree(pFilterData);
-    SR_ReadPairTableFree(pReadPairTable);
-    SR_BamInStreamFree(pBamInStream);
-}
-*/
-
+// clear the read pair table
 void SR_ReadPairTableClear(SR_ReadPairTable* pReadPairTable)
 {
     if (pReadPairTable->pLongPairArray != NULL)
@@ -926,12 +739,15 @@ void SR_ReadPairTableClear(SR_ReadPairTable* pReadPairTable)
     SR_SpecialPairTableClear(pReadPairTable->pSpecialPairTable, pReadPairTable->numChr);
 }
 
+// update the read pair table with the incoming read pairs
 void SR_ReadPairTableUpdate(SR_ReadPairTable* pReadPairTable, const bam1_t* pUpAlgn, const bam1_t* pDownAlgn, const SR_ZAtag* pZAtag,
         const SR_PairStats* pPairStats, const SR_LibInfoTable* pLibTable, const SR_FragLenHistArray* pHistArray, uint8_t minMQ)
 {
+    // check the read pair type
     SV_ReadPairType readPairType = PT_NORMAL;
     readPairType = SR_CheckReadPairType(pZAtag, pPairStats, pLibTable);
 
+    // check the mapping quality for all read pairs except the special read pairs
     if (readPairType != PT_SPECIAL5 && readPairType != PT_SPECIAL3)
     {
         if (pUpAlgn->core.qual < minMQ || pDownAlgn->core.qual < minMQ)
@@ -974,18 +790,27 @@ void SR_ReadPairTableUpdate(SR_ReadPairTable* pReadPairTable, const bam1_t* pUpA
     }
 }
 
+// open a seriers read pair files for output. A read pair
+// file will be open for each read pair type on each chromosome
 void* SR_ReadPairFilesOpen(const SR_LibInfoTable* pLibTable, uint32_t detectSet, const char* workingDir)
 {
     khash_t(file)* pFileHash = kh_init(file);
 
+    // buffer to hold the reference ID
     char refBuff[4];
+
+    // length of the working directory
     int dirLen = strlen(workingDir);
+
+    // buffer to hold the full read pair file name
     char nameBuff[dirLen + 50];
 
+    // copy the working directory name into the name buffer
     strncpy(nameBuff, workingDir, dirLen);
     char* namePos = nameBuff + dirLen;
     char* replacePos = namePos + 3;
 
+    // the reference ID should not be larger than 1000 (arbitrary, but reasonable)
     const SR_AnchorInfo* pAnchorInfo = pLibTable->pAnchorInfo;
     if (pAnchorInfo->size > 1000)
         SR_ErrQuit("ERROR: reference ID overflow (0-999).\n");
@@ -1000,6 +825,7 @@ void* SR_ReadPairFilesOpen(const SR_LibInfoTable* pLibTable, uint32_t detectSet,
         if (pAnchorInfo->pLength[i] <= 0)
             continue;
 
+        // copy the reference ID into the name buffer
         unsigned int offset = 2 - (unsigned int) log10(i);
         sprintf(refBuff, "000");
         sprintf(refBuff + offset, "%d", i);
@@ -1008,7 +834,6 @@ void* SR_ReadPairFilesOpen(const SR_LibInfoTable* pLibTable, uint32_t detectSet,
         int ret = 0;
         khiter_t khIter = 0;
         unsigned int fileIndex = SR_LONG_PAIR_FILE;
-
 
         for (unsigned int j = SV_DELETION; j <= SV_SPECIAL; ++j)
         {
@@ -1027,6 +852,7 @@ void* SR_ReadPairFilesOpen(const SR_LibInfoTable* pLibTable, uint32_t detectSet,
                 // leave a place for the total number of read pairs
                 fwrite(&placeHolder, sizeof(uint64_t), 1, stream.output);
 
+                // for tandem duplication we have two read types to take care
                 if (j == SV_TANDEM_DUP)
                 {
                     ++fileIndex;
@@ -1054,6 +880,7 @@ void* SR_ReadPairFilesOpen(const SR_LibInfoTable* pLibTable, uint32_t detectSet,
     return ((void*) pFileHash);
 }
 
+// close all the read pair files
 void SR_ReadPairFilesClose(void* pFileHash)
 {
     khash_t(file)* pHash = (khash_t(file)*) pFileHash;
@@ -1071,6 +898,7 @@ void SR_ReadPairFilesClose(void* pFileHash)
     kh_destroy(file, pHash);
 }
 
+// write the read pair table into the read pair files
 void SR_ReadPairTableWrite(const SR_ReadPairTable* pReadPairTable, void* pHash)
 {
     khash_t(file)* pFileHash = (khash_t(file)*) pHash;
@@ -1189,6 +1017,7 @@ void SR_ReadPairTableWrite(const SR_ReadPairTable* pReadPairTable, void* pHash)
     }
 }
 
+// write the special reference name into the end of the library information file
 void SR_SpecialPairTableWirteID(const SR_SpecialPairTable* pSpecialTable, FILE* libOutput)
 {
     // write the name of special reference at the end of the library file

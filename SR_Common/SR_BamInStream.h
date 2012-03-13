@@ -29,6 +29,7 @@
 
 typedef SR_StreamCode (*SR_BamFilter) (const bam1_t* pAlignment, void* pFilterData, int32_t currRefID, int32_t currBinPos);
 
+// control parameters for bam in stream
 typedef enum SR_StreamControlFlag
 {
     SR_NO_SPECIAL_CONTROL = 0,
@@ -49,25 +50,27 @@ typedef struct SR_StreamMode
 
 }SR_StreamMode;
 
+// alignment type
 typedef enum
 {
-    SR_UNIQUE_ORPHAN = 0, 
+    SR_UNIQUE_ORPHAN = 0,      // one mate is uniquely aligned the other mate is unaligned
 
-    SR_UNIQUE_SOFT = 1, 
+    SR_UNIQUE_SOFT = 1,        // one mate is uniquely aligned the other mate has may soft-clipping bases
 
-    SR_UNIQUE_MULTIPLE = 2,
+    SR_UNIQUE_MULTIPLE = 2,    // one mate is uniquely aligned the other mate is mutiply aligned
 
-    SR_UNIQUE_NORMAL = 3,
+    SR_UNIQUE_NORMAL = 3,      // both mates are uniquely aligned
 
-    SR_OTHER_ALGN_TYPE = 4
+    SR_OTHER_ALGN_TYPE = 4     // other alignment types
 
 }SR_AlgnType;
 
+// iterator used to retrieve the alignments and alignment types
 typedef struct SR_BamInStreamIter
 {
-    SR_BamNode* pBamNode;
+    SR_BamNode* pBamNode;    // a pointer to the bam node structure
 
-    SR_AlgnType* pAlgnType;
+    SR_AlgnType* pAlgnType;  // a pointer to the alignment type
 
 }SR_BamInStreamIter;
 
@@ -144,14 +147,60 @@ void SR_BamInStreamFree(SR_BamInStream* pBamInStream);
 //=============================================================== 
 SR_Status SR_BamInStreamJump(SR_BamInStream* pBamInStream, int32_t refID);
 
+//===============================================================
+// function:
+//      open a bam file
+//
+// args:
+//      1. pBamInStream: a pointer to an bam instream structure
+//      2. bamFileName: the name of the bam file
+// 
+// return:
+//      if open succeeds, return SR_OK; if not, return SR_ERR
+//=============================================================== 
 SR_Status SR_BamInStreamOpen(SR_BamInStream* pBamInStream, const char* bamFileName);
 
+//===============================================================
+// function:
+//      clear the bam instream object(return list, 
+//      alignment list and name hash)
+//
+// args:
+//      1. pBamInStream: a pointer to an bam instream structure
+//=============================================================== 
 void SR_BamInStreamClear(SR_BamInStream* pBamInStream);
 
+//===============================================================
+// function:
+//      close the current bam files and clear the bam instream
+//
+// args:
+//      1. pBamInStream: a pointer to an bam instream structure
+//=============================================================== 
 void SR_BamInStreamClose(SR_BamInStream* pBamInStream);
 
+//===============================================================
+// function:
+//      tell the current position in the bam file
+//
+// args:
+//      1. pBamInStream: a pointer to an bam instream structure
+//
+// return:
+//      the current position in the bam file
+//=============================================================== 
 #define SR_BamInStreamTell(pBamInStream) bam_tell((pBamInStream)->fpBamInput)
 
+//===============================================================
+// function:
+//      seek to a specific position in the bam file
+//
+// args:
+//      1. pBamInStream: a pointer to an bam instream structure
+//      2. pos: file position
+//      3. where: from where we should seek 
+//                (only SEEK_SET is allowed)
+//=============================================================== 
 #define SR_BamInStreamSeek(pBamInStream, pos, where) bam_seek((pBamInStream)->fpBamInput, pos, where)
 
 //================================================================
@@ -251,8 +300,7 @@ SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo,
 
 //==================================================================
 // function:
-//      check if a pair of alignment is qualified unique-orphan 
-//      pair
+//      get the alignment type from a read pair
 //
 // args:
 //      ppAnchor: a pointer to a pointer of bam node with anchor
@@ -262,8 +310,7 @@ SR_Status SR_BamInStreamLoadPair(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo,
 //      scTolerance: soft clipping tolerance
 //
 // return:
-//      if they are qualified unique orphan pair return TRUE
-//      else return FALSE
+//      the alignment type of the read pair
 //==================================================================
 SR_AlgnType SR_GetAlignmentType(SR_BamNode** ppAlgnOne, SR_BamNode** ppAlgnTwo, double scTolerance, double maxMismatchRate, unsigned char minMQ);
 
@@ -391,7 +438,5 @@ static inline SR_Status SR_BamInStreamPush(SR_BamInStream* pBamInStream, SR_BamN
 //      return value for the actual size of the memory pool
 //================================================================
 unsigned int SR_BamInStreamShrinkPool(SR_BamInStream* pBamInStream, unsigned int newSize);
-
-void SR_CheckBamInStream(int* pPrevHashSize, int* pCurrHashSize, int* pPrevListSize, int* pCurrListSize, const SR_BamInStream* pBamInStream);
 
 #endif  /*SR_BAMINSTREAM_H*/
