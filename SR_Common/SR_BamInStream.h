@@ -111,6 +111,14 @@ typedef struct SR_BamInStream
 
 }SR_BamInStream;
 
+typedef struct SR_SplitBamInStream
+{
+    bamFile fpBamInput;
+
+    int32_t currRefID;
+
+}SR_SplitBamInStream;
+
 
 //===============================
 // Constructors and Destructors
@@ -128,6 +136,10 @@ SR_BamInStream* SR_BamInStreamAlloc(uint32_t binLen,                       // se
 
 
 void SR_BamInStreamFree(SR_BamInStream* pBamInStream);
+
+SR_SplitBamInStream* SR_SplitBamInStreamAlloc(void);
+
+void SR_SplitBamInStreamFree(SR_SplitBamInStream* pSplitBamInStream);
 
 
 //======================
@@ -438,5 +450,12 @@ static inline SR_Status SR_BamInStreamPush(SR_BamInStream* pBamInStream, SR_BamN
 //      return value for the actual size of the memory pool
 //================================================================
 unsigned int SR_BamInStreamShrinkPool(SR_BamInStream* pBamInStream, unsigned int newSize);
+
+
+void SR_SplitBamInStreamOpen(SR_SplitBamInStream* pSplitBamInStream, const char* fileName);
+
+void SR_SplitBamInStreamClose(SR_SplitBamInStream* pSplitBamInStream);
+
+SR_Status SR_SplitBamInStreamRead(bam1_t (*pAlgns)[3], SR_SplitBamInStream* pSplitBamInStream);
 
 #endif  /*SR_BAMINSTREAM_H*/

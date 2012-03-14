@@ -18,10 +18,33 @@
 
 #include <limits.h>
 
+#include "khash.h"
 #include "SR_Error.h"
 #include "SR_Utilities.h"
 #include "SR_ReadPairDetect.h"
 
+static const char* SR_LibTableFileName = "lib_table.dat";
+
+// static const char* SR_HistFileName = "hist.dat";
+
+/*  
+static const char* SR_READ_PAIR_FILE_NAME_TEMPLATE[] = 
+{
+    "refXXX_long_pairs.dat",
+
+    "refXXX_short_pairs.dat",
+
+    "refXXX_reversed_pairs.dat",
+
+    "refXXX_inverted_pairs.dat",
+
+    "refXXX_cross_pairs.dat",
+
+    "refXXX_special_pairs.dat",
+};
+*/
+
+KHASH_MAP_INIT_STR(name, uint32_t);
 
 static void SR_DelEventMerge(SR_DelArray* pDelArray, SR_Cluster* pDelCluster)
 {
@@ -88,8 +111,99 @@ static int CompareDelEvents(const void* pEvent1, const void* pEvent2)
 }
 
 
+void SR_ReadPairDetect(const SR_ReadPairDetectPars* pDetectPars)
+{
+    // create a buffer to store the file name 
+    int dirLen = strlen(pDetectPars->workingDir);
+    char nameBuff[dirLen + 60];
+
+    // create the library information file name
+    strncpy(nameBuff, pDetectPars->workingDir, dirLen);
+    strcpy(nameBuff + dirLen, SR_LibTableFileName);
+
+    // read the library information into memory
+    FILE* pLibInput = fopen(nameBuff, "rb");
+    if (pLibInput == NULL)
+        SR_ErrQuit("ERROR: Cannot open library information file: \"%s\".\n", nameBuff);
+
+    // SR_LibInfoTable* pLibTable = SR_LibInfoTableRead(pLibInput);
+
+    // read the detect set
+    uint32_t detectSet = 0;
+    fread(&detectSet, sizeof(uint32_t), 1, pLibInput);
+}
+
+
+void SR_LocalPairArrayRead(SR_LocalPairArray* pLocalPairArray, FILE* input)
+{
+    int64_t size = 0;
+    fread(&(size), sizeof(int64_t), 1, input);
+
+    if (size > pLocalPairArray->capacity)
+        SR_ARRAY_RESIZE_NO_COPY(pLocalPairArray, size, SR_LocalPair);
+    else if (size <= 0)
+        return;
+
+    pLocalPairArray->size = size;
+    fread(pLocalPairArray->data, sizeof(SR_LocalPair), size, input);
+}
+
+void SR_CrossPairArrayRead(SR_CrossPairArray* pCrossPairArray, FILE* input)
+{
+    int64_t size = 0;
+    fread(&(size), sizeof(int64_t), 1, input);
+
+    if (size > pCrossPairArray->capacity)
+        SR_ARRAY_RESIZE_NO_COPY(pCrossPairArray, size, SR_CrossPair);
+    else if (size <= 0)
+        return;
+
+    pCrossPairArray->size = size;
+    fread(pCrossPairArray->data, sizeof(SR_LocalPair), size, input);
+}
+
+void SR_SpecialPairArrayRead(SR_SpecialPairArray* pSpecialPairArray, FILE* input)
+{
+    int64_t size = 0;
+    fread(&(size), sizeof(int64_t), 1, input);
+
+    if (size > pSpecialPairArray->capacity)
+        SR_ARRAY_RESIZE_NO_COPY(pSpecialPairArray, size, SR_SpecialPair);
+    else if (size <= 0)
+        return;
+
+    pSpecialPairArray->size = size;
+    fread(pSpecialPairArray->data, sizeof(SR_LocalPair), size, input);
+}
+
+void SR_SpecialPairTableReadID(SR_SpecialPairTable* pSpeicalPairTable, FILE* libInput)
+{
+    fread(&(pSpeicalPairTable->size), sizeof(uint32_t), 1, libInput);
+
+    if (pSpeicalPairTable->size > pSpeicalPairTable->capacity)
+    {
+        free(pSpeicalPairTable->names);
+        pSpeicalPairTable->names = (char (*)[3]) malloc(sizeof(char) * 3 * pSpeicalPairTable->size);
+        pSpeicalPairTable->capacity = pSpeicalPairTable->size;
+    }
+    else if (pSpeicalPairTable->size == 0)
+        return;
+
+    int ret = 0;
+    khiter_t khIter = 0;
+    for (unsigned int i = 0; i != pSpeicalPairTable->size; ++i)
+    {
+        fread(pSpeicalPairTable->names[i], sizeof(char), 2, libInput);
+        pSpeicalPairTable->names[i][2] = '\0';
+
+        khash_t(name)* pHash = pSpeicalPairTable->nameHash;
+        khIter = kh_put(name, pHash, pSpeicalPairTable->names[i], &ret);
+        kh_value(pHash, khIter) = i;
+    }
+}
+
 void SR_ReadPairFindDel(SR_DelArray* pDelArray, SV_AssistArray* pAssistArray, const SR_LocalPairArray* pLongPairArray,
-                        SR_Cluster* pDelCluster, const SR_LibInfoTable* pLibTable, const SR_DetectControlPars* pPars)
+                        SR_Cluster* pDelCluster, const SR_LibInfoTable* pLibTable, const SR_ReadPairDetectPars* pPars)
 {
     SR_ARRAY_RESIZE_NO_COPY(pDelArray, pDelCluster->pElmntArray->size, SR_DelEvent);
 
@@ -120,7 +234,7 @@ void SR_ReadPairFindDel(SR_DelArray* pDelArray, SV_AssistArray* pAssistArray, co
         int fragLenMax = 0;
 
         int numReadPair = pDelCluster->pElmntArray->data[i].numReadPair;
-        SV_AssistArrayResize(pAssistArray, numReadPair);
+        // SV_AssistArrayResize(pAssistArray, numReadPair);
 
         unsigned int j = pDelCluster->pElmntArray->data[i].startIndex;
         unsigned int startIndex = pDelCluster->pElmntArray->data[i].startIndex;
@@ -151,7 +265,7 @@ void SR_ReadPairFindDel(SR_DelArray* pDelArray, SV_AssistArray* pAssistArray, co
                 endMax3 = downEnd;
 
             unsigned int upperFragLen = pLibTable->pLibInfo[pLongPair->readGrpID].fragLenHigh;
-            unsigned int medianFragLen = pLibTable->pLibInfo[pLongPair->readGrpID].fraglenMedian;
+            unsigned int medianFragLen = pLibTable->pLibInfo[pLongPair->readGrpID].fragLenMedian;
 
             if (upperFragLen > fragLenMax)
                 fragLenMax = upperFragLen;
@@ -243,5 +357,5 @@ void SR_ReadPairFindDel(SR_DelArray* pDelArray, SV_AssistArray* pAssistArray, co
 
     qsort(pDelArray->data, pDelArray->size, sizeof(SR_DelEvent), CompareDelEvents);
 
-    SR_DelEventGenotype(pDelArray, pLibTable);
+    //SR_DelEventGenotype(pDelArray, pLibTable);
 }

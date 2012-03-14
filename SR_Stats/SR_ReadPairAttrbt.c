@@ -17,6 +17,7 @@
  */
 
 #include "SR_Error.h"
+#include "SR_Utilities.h"
 #include "SR_ReadPairAttrbt.h"
 
 #define DEFAULT_RP_ATTRB_CAPACITY 50
@@ -67,7 +68,7 @@ SR_ReadPairAttrbtArray* SR_ReadPairAttrbtArrayAlloc(uint32_t numReadGrp)
 
     pAttrbtArray->numReadGrp = numReadGrp;
     pAttrbtArray->size = 0;
-    pAttrbtArray->capapcity = DEFAULT_RP_ATTRB_CAPACITY;
+    pAttrbtArray->capacity = DEFAULT_RP_ATTRB_CAPACITY;
 
     return pAttrbtArray;
 }
@@ -87,14 +88,14 @@ void SR_ReadPairAttrbtArrayReInit(SR_ReadPairAttrbtArray* pAttrbtArray, uint64_t
 {
     pAttrbtArray->size = 0;
 
-    if (newCapacity > pAttrbtArray->capapcity)
+    if (newCapacity > pAttrbtArray->capacity)
     {
         free(pAttrbtArray->data);
         pAttrbtArray->data = (SR_ReadPairAttrbt*) malloc(newCapacity * sizeof(SR_ReadPairAttrbt));
         if (pAttrbtArray->data == NULL)
             SR_ErrQuit("ERROR: Not enough memory for the storage of the read pair attributes in the read pair attribute array object.\n");
 
-        pAttrbtArray->capapcity = newCapacity;
+        pAttrbtArray->capacity = newCapacity;
     }
 }
 
@@ -110,7 +111,7 @@ void SR_ReadPairMakeLocal(SR_ReadPairAttrbtArray* pAttrbtArray, const SR_LocalPa
         pAttrbtArray->data[i].origIndex = i;
         pAttrbtArray->data[i].readGrpID = pLocalPairArray->data[i].readGrpID;
 
-        double median = pLibTable->pLibInfo[pAttrbtArray->data[i].readGrpID].fraglenMedian;
+        double median = pLibTable->pLibInfo[pAttrbtArray->data[i].readGrpID].fragLenMedian;
 
         pAttrbtArray->data[i].firstAttribute =  pLocalPairArray->data[i].upPos + (double) pLocalPairArray->data[i].fragLen / 2;
         pAttrbtArray->data[i].secondAttribute = pLocalPairArray->data[i].fragLen - median;
@@ -122,7 +123,7 @@ void SR_ReadPairMakeLocal(SR_ReadPairAttrbtArray* pAttrbtArray, const SR_LocalPa
     double boundScale[2] = {1.25, 0.5};
     for (unsigned int i = 0; i != pAttrbtArray->numReadGrp; ++i)
     {
-        pAttrbtArray->pBoundaries[i][0] = (double) pLibTable->pLibInfo[i].fraglenMedian * boundScale[0];
+        pAttrbtArray->pBoundaries[i][0] = (double) pLibTable->pLibInfo[i].fragLenMedian * boundScale[0];
         pAttrbtArray->pBoundaries[i][1] = (double) (pLibTable->pLibInfo[i].fragLenHigh - pLibTable->pLibInfo[i].fragLenLow) * boundScale[1];
     }
 
@@ -157,11 +158,11 @@ void SR_ReadPairMakeCross(SR_ReadPairAttrbtArray* pAttrbtArray, const SR_LibInfo
 
 void SR_ReadPairMakeInverted(SR_ReadPairAttrbtArray* pAttrbtArrays[2], const SR_LibInfoTable* pLibTable, const SR_LocalPairArray* pInvertedPairArray)
 {
-    SR_ReadPairAttrbtArrayReInit(pAttrbtArrays[0], pInvertedPairArray->subSize[0]);
-    SR_ReadPairAttrbtArrayReInit(pAttrbtArrays[1], pInvertedPairArray->subSize[1]);
+    SR_ReadPairAttrbtArrayReInit(pAttrbtArrays[0], pInvertedPairArray->size / 2);
+    SR_ReadPairAttrbtArrayReInit(pAttrbtArrays[1], pInvertedPairArray->size / 2);
 
-    pAttrbtArrays[0]->size = pInvertedPairArray->subSize[0];
-    pAttrbtArrays[1]->size = pInvertedPairArray->subSize[1];
+    pAttrbtArrays[0]->size = 0;
+    pAttrbtArrays[1]->size = 0;
 
     pAttrbtArrays[0]->readPairType = PT_INVERTED3;
     pAttrbtArrays[1]->readPairType = PT_INVERTED5;
@@ -174,13 +175,18 @@ void SR_ReadPairMakeInverted(SR_ReadPairAttrbtArray* pAttrbtArrays[2], const SR_
         const SR_LocalPair* pInvertedPair = pInvertedPairArray->data + i;
         int arrayIndex = pInvertedPair->readPairType - PT_INVERTED3;
 
+        if (pAttrbtArrays[arrayIndex]->size == pAttrbtArrays[arrayIndex]->capacity)
+            SR_ARRAY_RESIZE(pAttrbtArrays[arrayIndex], pAttrbtArrays[arrayIndex]->capacity * 2, SR_ReadPairAttrbt);
+
         pAttrbtArrays[arrayIndex]->data[i].origIndex = i;
         pAttrbtArrays[arrayIndex]->data[i].readGrpID = pInvertedPair->readGrpID;
 
-        double median = pLibTable->pLibInfo[pInvertedPair->readGrpID].fraglenMedian;
+        double median = pLibTable->pLibInfo[pInvertedPair->readGrpID].fragLenMedian;
 
         pAttrbtArrays[arrayIndex]->data[i].firstAttribute =  pInvertedPair->upPos + (double) pInvertedPair->fragLen / 2;
         pAttrbtArrays[arrayIndex]->data[i].secondAttribute = pInvertedPair->fragLen - median;
+
+        ++(pAttrbtArrays[arrayIndex]->size);
     }
 
     qsort(pAttrbtArrays[0]->data, pAttrbtArrays[0]->size, sizeof(pAttrbtArrays[0]->data[0]), CompareAttrbt);
@@ -190,7 +196,7 @@ void SR_ReadPairMakeInverted(SR_ReadPairAttrbtArray* pAttrbtArrays[2], const SR_
     double boundScale[2] = {1.25, 0.5};
     for (unsigned int i = 0; i != pAttrbtArrays[0]->numReadGrp; ++i)
     {
-        pAttrbtArrays[0]->pBoundaries[i][0] = (double) pLibTable->pLibInfo[i].fraglenMedian * boundScale[0] * 2.0;
+        pAttrbtArrays[0]->pBoundaries[i][0] = (double) pLibTable->pLibInfo[i].fragLenMedian * boundScale[0] * 2.0;
         pAttrbtArrays[0]->pBoundaries[i][1] = (double) (pLibTable->pLibInfo[i].fragLenHigh - pLibTable->pLibInfo[i].fragLenLow) * boundScale[1];
     }
 
@@ -199,11 +205,11 @@ void SR_ReadPairMakeInverted(SR_ReadPairAttrbtArray* pAttrbtArrays[2], const SR_
 
 void SR_ReadPairMakeSpecial(SR_ReadPairAttrbtArray* pAttrbtArrays[2], const SR_SpecialPairArray* pSpecialPairArray, const SR_LibInfoTable* pLibTable)
 {
-    SR_ReadPairAttrbtArrayReInit(pAttrbtArrays[0], pSpecialPairArray->subSize[0]);
-    SR_ReadPairAttrbtArrayReInit(pAttrbtArrays[1], pSpecialPairArray->subSize[1]);
+    SR_ReadPairAttrbtArrayReInit(pAttrbtArrays[0], pSpecialPairArray->size / 2);
+    SR_ReadPairAttrbtArrayReInit(pAttrbtArrays[1], pSpecialPairArray->size / 2);
 
-    pAttrbtArrays[0]->size = pSpecialPairArray->subSize[0];
-    pAttrbtArrays[1]->size = pSpecialPairArray->subSize[1];
+    pAttrbtArrays[0]->size = 0;
+    pAttrbtArrays[1]->size = 0;
 
     pAttrbtArrays[0]->readPairType = PT_SPECIAL3;
     pAttrbtArrays[1]->readPairType = PT_SPECIAL5;
@@ -212,9 +218,12 @@ void SR_ReadPairMakeSpecial(SR_ReadPairAttrbtArray* pAttrbtArrays[2], const SR_S
     {
         const SR_SpecialPair* pSpecialPair = pSpecialPairArray->data + i;
         int arrayIndex = pSpecialPair->readPairType - PT_SPECIAL3;
-        double halfMedian = pLibTable->pLibInfo[pSpecialPair->readGrpID].fraglenMedian / 2.0;
+        double halfMedian = pLibTable->pLibInfo[pSpecialPair->readGrpID].fragLenMedian / 2.0;
         double halfMedians[2] = {halfMedian, -halfMedian};
         uint32_t pos[2] = {pSpecialPair->pos[0], pSpecialPair->end[0]};
+
+        if (pAttrbtArrays[arrayIndex]->size == pAttrbtArrays[arrayIndex]->capacity)
+            SR_ARRAY_RESIZE(pAttrbtArrays[arrayIndex], pAttrbtArrays[arrayIndex]->capacity * 2, SR_ReadPairAttrbt);
 
         pAttrbtArrays[arrayIndex]->data[i].origIndex = i;
         pAttrbtArrays[arrayIndex]->data[i].readGrpID = pSpecialPair->readGrpID;

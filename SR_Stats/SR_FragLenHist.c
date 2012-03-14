@@ -45,7 +45,7 @@ static inline int CompareFragLenBin(const void* a, const void* b)
 
 static void SR_FragLenHistToMature(SR_FragLenHist* pHist)
 {
-    const khash_t(fragLen)* pRawHist = pHist->rawHist;
+    khash_t(fragLen)* pRawHist = pHist->rawHist;
 
     pHist->size = kh_size(pRawHist);
 
@@ -86,11 +86,11 @@ static void SR_FragLenHistToMature(SR_FragLenHist* pHist)
     SR_Bool foundMedian = FALSE;
     for (unsigned int j = 0; j != pHist->size; ++j)
     {
-        khiter_t khIter = kh_get(fragLen, pHist->rawHist, pHist->fragLen[j]);
-        if (khIter == kh_end((khash_t(fragLen)*) pHist->rawHist))
+        khiter_t khIter = kh_get(fragLen, pRawHist, pHist->fragLen[j]);
+        if (khIter == kh_end(pRawHist))
             SR_ErrQuit("ERROR: Cannot find the fragment length frequency from the hash table.\n");
 
-        pHist->freq[j] = kh_value((khash_t(fragLen)*) pHist->rawHist, khIter);
+        pHist->freq[j] = kh_value(pRawHist, khIter);
 
         totalFragLen += pHist->fragLen[j] * pHist->freq[j];
         cumFreq += pHist->freq[j];
@@ -105,7 +105,7 @@ static void SR_FragLenHistToMature(SR_FragLenHist* pHist)
         cdf = cdf > 0.5 ? 1.0 - cdf : cdf;
 
         fragLenQual = DoubleRoundToInt(-10.0 * log10(cdf));
-        kh_value((khash_t(fragLen)*) pHist->rawHist, khIter) = fragLenQual;
+        kh_value(pRawHist, khIter) = fragLenQual;
     }
 
     pHist->mean = totalFragLen / totalFreq;

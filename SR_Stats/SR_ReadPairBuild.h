@@ -289,6 +289,8 @@ void SR_ReadPairFilesClose(void* pFileHash);
 //=================================================================
 void SR_ReadPairTableWrite(const SR_ReadPairTable* pReadPairTable, void* pFileHash);
 
+void SR_ReadPairTableWriteDetectSet(const SR_ReadPairTable* pReadPairTable, FILE* libOutput);
+
 //=================================================================
 // function:
 //      write the special reference name into the end of the

@@ -236,6 +236,25 @@ void SR_BamInStreamFree(SR_BamInStream* pBamInStream)
     }
 }
 
+SR_SplitBamInStream* SR_SplitBamInStreamAlloc(void)
+{
+    SR_SplitBamInStream* pSplitBamInStream = (SR_SplitBamInStream*) calloc(sizeof(SR_SplitBamInStream), 1);
+    if (pSplitBamInStream == NULL)
+        SR_ErrQuit("ERROR: Not enough memory for the split bam instream object.\n");
+
+    return pSplitBamInStream;
+}
+
+void SR_SplitBamInStreamFree(SR_SplitBamInStream* pSplitBamInStream)
+{
+    if (pSplitBamInStream != NULL)
+    {
+        SR_SplitBamInStreamClose(pSplitBamInStream);
+
+        free(pSplitBamInStream);
+    }
+}
+
 
 //======================
 // Interface functions
@@ -646,5 +665,27 @@ unsigned int SR_BamInStreamShrinkPool(SR_BamInStream* pBamInStream, unsigned int
     }
 
     return pBamInStream->pMemPool->numBuffs;
+}
+
+void SR_SplitBamInStreamOpen(SR_SplitBamInStream* pSplitBamInStream, const char* fileName)
+{
+    pSplitBamInStream->fpBamInput = bam_open(fileName, "r");
+    if (pSplitBamInStream == NULL)
+        SR_ErrQuit("ERROR: Cannot open the split bam file: \"%s\"", fileName);
+}
+
+void SR_SplitBamInStreamClose(SR_SplitBamInStream* pSplitBamInStream)
+{
+    if (pSplitBamInStream->fpBamInput != NULL)
+    {
+        bam_close(pSplitBamInStream->fpBamInput);
+        pSplitBamInStream->fpBamInput = NULL;
+    }
+}
+
+SR_Status SR_SplitBamInStreamRead(bam1_t (*pAlgns)[3], SR_SplitBamInStream* pSplitBamInStream)
+{
+
+    return SR_OK;
 }
 

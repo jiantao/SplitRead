@@ -1166,7 +1166,7 @@ SR_LibInfoTable* SR_LibInfoTableRead(FILE* libFile)
     if (readSize != 1)
         SR_ErrQuit("ERROR: Cannot read the number of read group from the library file.\n");
 
-    SR_LibInfoTable* pTable = SR_LibInfoTableAlloc(sizeSM, sizeSM, sizeRG);
+    SR_LibInfoTable* pTable = SR_LibInfoTableAlloc(sizeAC, sizeSM, sizeRG);
 
     pTable->pAnchorInfo->size = sizeAC;
     pTable->pSampleInfo->size = sizeSM;

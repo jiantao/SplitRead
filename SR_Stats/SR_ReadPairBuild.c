@@ -35,11 +35,11 @@
 
 #define DEFAULT_SP_TABLE_CAPACITY 10
 
-const char* SR_LibTableFileName = "lib_table.dat";
+static const char* SR_LibTableFileName = "lib_table.dat";
 
-const char* SR_HistFileName = "hist.dat";
+static const char* SR_HistFileName = "hist.dat";
 
-const char* SR_READ_PAIR_FILE_NAME_TEMPLATE[] = 
+static const char* SR_READ_PAIR_FILE_NAME_TEMPLATE[] = 
 {
     "refXXX_long_pairs.dat",
 
@@ -687,6 +687,7 @@ void SR_ReadPairBuild(const SR_ReadPairBuildPars* pBuildPars)
         SR_ErrQuit("ERROR: Cannot open the library output file: %s\n", libTableOutputFile);
 
     SR_LibInfoTableWrite(pLibTable, libTableOutput);
+    SR_ReadPairTableWriteDetectSet(pReadPairTable, libTableOutput);
     SR_SpecialPairTableWirteID(pReadPairTable->pSpecialPairTable, libTableOutput);
 
     // clean up
@@ -1017,6 +1018,11 @@ void SR_ReadPairTableWrite(const SR_ReadPairTable* pReadPairTable, void* pHash)
     }
 }
 
+void SR_ReadPairTableWriteDetectSet(const SR_ReadPairTable* pReadPairTable, FILE* libOutput)
+{
+    fwrite(&(pReadPairTable->detectSet), sizeof(uint32_t), 1, libOutput);
+}
+
 // write the special reference name into the end of the library information file
 void SR_SpecialPairTableWirteID(const SR_SpecialPairTable* pSpecialTable, FILE* libOutput)
 {
@@ -1024,8 +1030,6 @@ void SR_SpecialPairTableWirteID(const SR_SpecialPairTable* pSpecialTable, FILE* 
     fwrite(&(pSpecialTable->size), sizeof(uint32_t), 1, libOutput);
     for (unsigned int i = 0; i != pSpecialTable->size; ++i)
         fwrite(pSpecialTable->names + i, sizeof(char), 2, libOutput);
-
-    fflush(libOutput);
 }
 
 static SR_Status SR_DoDir(const char* path, mode_t mode)

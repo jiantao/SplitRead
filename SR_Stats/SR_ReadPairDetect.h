@@ -20,14 +20,19 @@
 #define  SR_READPAIRDETECT_H
 
 #include "SR_Cluster.h"
+#include "SR_ReadPairBuild.h"
 
-typedef struct SR_DetectControlPars
+typedef struct SR_ReadPairDetectPars
 {
+    char* workingDir;
+
+    int workingRefID[2];
+
     int minNumClustered;
 
     int minEventLength;
 
-}SR_DetectControlPars;
+}SR_ReadPairDetectPars;
 
 typedef struct SR_DelEvent
 {
@@ -79,13 +84,25 @@ SV_AssistArray* SV_AssistArrayAlloc(void);
 
 void SV_AssistArrayFree(SV_AssistArray* pAssistArray);
 
-void SV_AssistArrayResize(SV_AssistArray* pAssistArray, unsigned int newSize);
 
+void SR_ReadPairDetect(const SR_ReadPairDetectPars* pDetectPars);
+
+void SR_LocalPairArrayRead(SR_LocalPairArray* pLongPairArray, FILE* input);
+
+void SR_CrossPairArrayRead(SR_CrossPairArray* pCrossPairArray, FILE* input);
+
+void SR_SpecialPairArrayRead(SR_SpecialPairArray* pSpecialPairArray, FILE* input);
+
+void SR_SpecialPairTableReadID(SR_SpecialPairTable* pSpeicalPairTable, FILE* libInput);
+
+// void SV_AssistArrayResize(SV_AssistArray* pAssistArray, unsigned int newSize);
+
+/*  
 void SR_ReadPairFindDel(SR_DelArray* pDelArray, SV_AssistArray* pAssistArray, const SR_LocalPairArray* pLongPairArray,
-                        SR_Cluster* pDelCluster, const SR_LibInfoTable* pLibTable, const SR_DetectControlPars* pPars);
-
+                        SR_Cluster* pDelCluster, const SR_LibInfoTable* pLibTable, const SR_ReadPairDetectPars* pPars);
 
 void SR_DelEventGenotype(SR_DelArray* pDelArray, const SR_LibInfoTable* pLibTable);
+*/
 
 
 #endif  /*SR_READPAIRDETECT_H*/

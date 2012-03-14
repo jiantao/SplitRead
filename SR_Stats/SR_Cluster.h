@@ -71,9 +71,11 @@ typedef struct SR_Cluster
 
 }SR_Cluster;
 
-SR_Cluster* SR_ClusterAlloc(const SR_ReadPairAttrbtArray* pAttrbtArray, int minReadPairNum, double minStd[2]);
+SR_Cluster* SR_ClusterAlloc(const SR_ReadPairAttrbtArray* pAttrbtArray, int minReadPairNum);
 
 void SR_ClusterFree(SR_Cluster* pCluster);
+
+void SR_ClusterSetMinStd(SR_Cluster* pCluster, double minStd[2]);
 
 void SR_ClusterReinit(SR_Cluster* pCluster, const SR_ReadPairAttrbtArray* pAttrbtArray);
 
@@ -82,6 +84,8 @@ void SR_ClusterMake(SR_Cluster* pCluster);
 void SR_ClusterBuild(SR_Cluster* pCluster);
 
 void SR_ClusterFinalize(SR_Cluster* pCluster);
+
+int SR_ClusterClean(SR_Cluster* pCluster);
 
 int SR_ClusterMerge(SR_Cluster* pCluster, int dstIndex, int srcIndex);
 

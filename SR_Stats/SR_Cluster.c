@@ -99,7 +99,7 @@ static int SR_ClusterAddElmnt(SR_Cluster* pCluster, int attrbtID)
     return clusterID;
 }
 
-SR_Cluster* SR_ClusterAlloc(const SR_ReadPairAttrbtArray* pAttrbtArray, int minReadPairNum, double minStd[2])
+SR_Cluster* SR_ClusterAlloc(const SR_ReadPairAttrbtArray* pAttrbtArray, int minReadPairNum)
 {
     SR_Cluster* pCluster = (SR_Cluster*) malloc(sizeof(SR_Cluster));
     if (pCluster == NULL)
@@ -112,8 +112,8 @@ SR_Cluster* SR_ClusterAlloc(const SR_ReadPairAttrbtArray* pAttrbtArray, int minR
     pCluster->capacity = pAttrbtArray->size;
 
     pCluster->minReadPairNum = minReadPairNum;
-    pCluster->minStd[0] = minStd[0];
-    pCluster->minStd[1] = minStd[1];
+    pCluster->minStd[0] = -1.0;
+    pCluster->minStd[1] = -1.0;
 
     pCluster->pNext = (int*) malloc(pCluster->capacity * sizeof(int));
     if (pCluster->pNext == NULL)
@@ -149,6 +149,12 @@ void SR_ClusterFree(SR_Cluster* pCluster)
 
         free(pCluster);
     }
+}
+
+void SR_ClusterSetMinStd(SR_Cluster* pCluster, double minStd[2])
+{
+    pCluster->minStd[0] = minStd[0];
+    pCluster->minStd[1] = minStd[1];
 }
 
 void SR_ClusterReinit(SR_Cluster* pCluster, const SR_ReadPairAttrbtArray* pAttrbtArray)
@@ -255,6 +261,7 @@ void SR_ClusterBuild(SR_Cluster* pCluster)
 
 void SR_ClusterFinalize(SR_Cluster* pCluster)
 {
+    // create a hash to transfer the cluster center ID to cluster element ID
     khash_t(clusterMap)* clusterHash = kh_init(clusterMap);
     kh_resize(clusterMap, clusterHash, DEFAULT_CLUSTER_SIZE);
 
@@ -295,11 +302,11 @@ void SR_ClusterFinalize(SR_Cluster* pCluster)
 
 int SR_ClusterClean(SR_Cluster* pCluster)
 {
-    int oldReadPairNum = pCluster->pElmntArray->size;
+    int oldClusterSize = pCluster->pElmntArray->size;
 
     // lazy deletion
     // the deleted elements' number of read pairs will be set to zero
-    for (unsigned int i = 0; i != pCluster->pElmntArray->size; ++i)
+    for (unsigned int i = 0; i != oldClusterSize; ++i)
     {
         if (pCluster->pElmntArray->data[i].numReadPair <= pCluster->minReadPairNum
             || pCluster->pElmntArray->data[i].std[0] <= pCluster->minStd[0]
@@ -310,7 +317,7 @@ int SR_ClusterClean(SR_Cluster* pCluster)
         }
     }
 
-    return oldReadPairNum;
+    return oldClusterSize;
 }
 
 int SR_ClusterMerge(SR_Cluster* pCluster, int dstIndex, int srcIndex)

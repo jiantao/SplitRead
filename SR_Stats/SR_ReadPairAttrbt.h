@@ -44,7 +44,7 @@ typedef struct SR_ReadPairAttrbtArray
 
     uint64_t size;
 
-    uint64_t capapcity;
+    uint64_t capacity;
 
     uint32_t numReadGrp;
 
@@ -60,7 +60,7 @@ void SR_ReadPairAttrbtArrayFree(SR_ReadPairAttrbtArray* pAttrbtArray);
 
 #define SR_ReadPairAttrbtArrayGetSecondBound(pAttrbtArray, i) ((pAttrbtArray)->pBoundaries[(pAttrbtArray)->data[(i)].readGrpID][1])
 
-void SR_ReadPairAttrbtArrayReInit(SR_ReadPairAttrbtArray* pAttrbtArray, uint32_t newCapacity);
+void SR_ReadPairAttrbtArrayReInit(SR_ReadPairAttrbtArray* pAttrbtArray, uint64_t newCapacity);
 
 void SR_ReadPairMakeLocal(SR_ReadPairAttrbtArray* pAttrbtArray, const SR_LocalPairArray* pLocalPairArray, const SR_LibInfoTable* pLibTable, SV_ReadPairType readpairType);
 
